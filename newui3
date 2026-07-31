@@ -1,0 +1,2777 @@
+-- ==============================
+-- Project: Secure x Maangas Hub (Updated Player Info with Country, Device & Full Features)
+-- ==============================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
+local SoundService = game:GetService("SoundService")
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
+local TeleportService = game:GetService("TeleportService")
+local LocalizationService = game:GetService("LocalizationService")
+local Terrain = workspace:FindFirstChildOfClass("Terrain")
+local Camera = workspace.CurrentCamera
+
+local LocalPlayer = Players.LocalPlayer
+
+if CoreGui:FindFirstChild("SecureMaangasUI") then
+    CoreGui.SecureMaangasUI:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SecureMaangasUI"
+ScreenGui.Parent = CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 999999
+
+local current_accent = Color3.fromRGB(0, 229, 255)
+local color_soft_white = Color3.fromRGB(240, 240, 245)
+local color_dark_text = Color3.fromRGB(35, 35, 40)
+local color_gray = Color3.fromRGB(140, 140, 150)
+
+local accentDependentStrokes = {}
+local accentDependentBlades = {}
+local accentDependentScrollbars = {}
+local accentDependentDrawings = {}
+local allDraggableElements = {}
+local isFloatingLocked = false
+local isVisible = true
+
+local function UpdateAllAccents(newColor)
+    current_accent = newColor
+    for _, stroke in ipairs(accentDependentStrokes) do
+        if stroke and stroke.Parent then
+            stroke.Color = newColor
+        end
+    end
+    for _, blade in ipairs(accentDependentBlades) do
+        if blade and blade.Parent then
+            blade.BackgroundColor3 = newColor
+        end
+    end
+    for _, scroll in ipairs(accentDependentScrollbars) do
+        if scroll and scroll.Parent then
+            scroll.ScrollBarImageColor3 = newColor
+        end
+    end
+    for _, drawing in ipairs(accentDependentDrawings) do
+        if drawing then
+            drawing.Color = newColor
+        end
+    end
+end
+
+local function Tween(obj, prop, val, time, style, direction)
+    local info = TweenInfo.new(time or 0.25, style or Enum.EasingStyle.Quad, direction or Enum.EasingDirection.Out)
+    TweenService:Create(obj, info, {[prop] = val}):Play()
+end
+
+local function showNotification(message)
+    task.spawn(function()
+        local NotifFrame = Instance.new("Frame")
+        NotifFrame.Size = UDim2.new(0, 280, 0, 40)
+        NotifFrame.Position = UDim2.new(0.5, -140, 0, -50)
+        NotifFrame.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
+        NotifFrame.BackgroundTransparency = 0.1
+        NotifFrame.BorderSizePixel = 0
+        NotifFrame.ZIndex = 500
+        NotifFrame.Parent = ScreenGui
+
+        local corner = Instance.new("UICorner") corner.CornerRadius = UDim.new(0, 8) corner.Parent = NotifFrame
+        local stroke = Instance.new("UIStroke") stroke.Color = current_accent stroke.Thickness = 1.5 stroke.Parent = NotifFrame
+        table.insert(accentDependentStrokes, stroke)
+
+        local text = Instance.new("TextLabel")
+        text.Size = UDim2.new(1, 0, 1, 0)
+        text.BackgroundTransparency = 1
+        text.TextColor3 = color_dark_text
+        text.TextSize = 11
+        text.Font = Enum.Font.GothamBold
+        text.Text = message
+        text.ZIndex = 501
+        text.Parent = NotifFrame
+
+        Tween(NotifFrame, "Position", UDim2.new(0.5, -140, 0, 30), 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        task.wait(1.8)
+        Tween(NotifFrame, "Position", UDim2.new(0.5, -140, 0, -50), 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        task.wait(0.3)
+        NotifFrame:Destroy()
+    end)
+end
+
+local function showPopupAnnouncement(message)
+    task.spawn(function()
+        local PopupBg = Instance.new("Frame")
+        PopupBg.Size = UDim2.new(1, 0, 1, 0)
+        PopupBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        PopupBg.BackgroundTransparency = 1
+        PopupBg.BorderSizePixel = 0
+        PopupBg.ZIndex = 9998
+        PopupBg.Parent = ScreenGui
+
+        local PopupFrame = Instance.new("Frame")
+        PopupFrame.Size = UDim2.new(0, 0, 0, 0)
+        PopupFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+        PopupFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+        PopupFrame.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
+        PopupFrame.BackgroundTransparency = 0.05
+        PopupFrame.BorderSizePixel = 0
+        PopupFrame.ZIndex = 9999
+        PopupFrame.Parent = ScreenGui
+
+        local pCorner = Instance.new("UICorner") pCorner.CornerRadius = UDim.new(0, 12) pCorner.Parent = PopupFrame
+        local pStroke = Instance.new("UIStroke") pStroke.Color = current_accent pStroke.Thickness = 2 pStroke.Parent = PopupFrame
+        table.insert(accentDependentStrokes, pStroke)
+
+        local pTitle = Instance.new("TextLabel")
+        pTitle.Size = UDim2.new(1, 0, 0, 35)
+        pTitle.BackgroundTransparency = 1
+        pTitle.Font = Enum.Font.GothamBold
+        pTitle.Text = "📢 CODEX ANNOUNCEMENT"
+        pTitle.TextColor3 = color_dark_text
+        pTitle.TextSize = 12
+        pTitle.ZIndex = 10000
+        pTitle.Parent = PopupFrame
+
+        local pMsg = Instance.new("TextLabel")
+        pMsg.Size = UDim2.new(1, -30, 0, 80)
+        pMsg.Position = UDim2.new(0, 15, 0, 35)
+        pMsg.BackgroundTransparency = 1
+        pMsg.Font = Enum.Font.GothamSemibold
+        pMsg.Text = message
+        pMsg.TextColor3 = color_dark_text
+        pMsg.TextSize = 12
+        pMsg.TextWrapped = true
+        pMsg.ZIndex = 10000
+        pMsg.Parent = PopupFrame
+
+        Tween(PopupBg, "BackgroundTransparency", 0.6, 0.3)
+        Tween(PopupFrame, "Size", UDim2.new(0, 320, 0, 140), 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+
+        if not ScreenGui:FindFirstChild("ActiveAnnouncements") then
+            local folder = Instance.new("Folder")
+            folder.Name = "ActiveAnnouncements"
+            folder.Parent = ScreenGui
+        end
+        PopupBg.Parent = ScreenGui.ActiveAnnouncements
+        PopupFrame.Parent = ScreenGui.ActiveAnnouncements
+    end)
+end
+
+local function MakeDraggableCustom(element)
+    table.insert(allDraggableElements, element)
+    local dragging, dragInput, dragStart, startPos
+
+    element.InputBegan:Connect(function(input)
+        if isFloatingLocked then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = element.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    element.InputChanged:Connect(function(input)
+        if isFloatingLocked then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if isFloatingLocked then return end
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            element.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- ==============================
+-- SOFT WHITE LOGIN SYSTEM
+-- ==============================
+
+local LoginFrame = Instance.new("Frame")
+LoginFrame.Name = "LoginFrame"
+LoginFrame.Parent = ScreenGui
+LoginFrame.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
+LoginFrame.BackgroundTransparency = 0.1
+LoginFrame.BorderSizePixel = 0
+LoginFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+LoginFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+LoginFrame.Size = UDim2.new(0, 0, 0, 0)
+LoginFrame.ClipsDescendants = true
+LoginFrame.Active = true
+
+local LoginCorner = Instance.new("UICorner") LoginCorner.CornerRadius = UDim.new(0, 12) LoginCorner.Parent = LoginFrame
+local LoginStroke = Instance.new("UIStroke") LoginStroke.Parent = LoginFrame LoginStroke.Color = current_accent LoginStroke.Thickness = 1.5
+table.insert(accentDependentStrokes, LoginStroke)
+
+Tween(LoginFrame, "Size", UDim2.new(0, 380, 0, 260), 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+
+local LoginTitle = Instance.new("TextLabel")
+LoginTitle.Parent = LoginFrame
+LoginTitle.BackgroundTransparency = 1
+LoginTitle.Position = UDim2.new(0, 0, 0, 20)
+LoginTitle.Size = UDim2.new(1, 0, 0, 25)
+LoginTitle.Font = Enum.Font.GothamBold
+LoginTitle.Text = "CODEX LOGIN SECURED"
+LoginTitle.TextColor3 = color_dark_text
+LoginTitle.TextSize = 16
+
+local KeyBox = Instance.new("TextBox")
+KeyBox.Parent = LoginFrame
+KeyBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+KeyBox.BackgroundTransparency = 0.3
+KeyBox.BorderSizePixel = 0
+KeyBox.Position = UDim2.new(0.1, 0, 0, 70)
+KeyBox.Size = UDim2.new(0.8, 0, 0, 40)
+KeyBox.Font = Enum.Font.GothamBold
+KeyBox.PlaceholderText = "Enter your license key..."
+KeyBox.Text = ""
+KeyBox.TextColor3 = color_dark_text
+KeyBox.PlaceholderColor3 = color_gray
+KeyBox.TextSize = 12
+
+local KeyCorner = Instance.new("UICorner") KeyCorner.CornerRadius = UDim.new(0, 8) KeyCorner.Parent = KeyBox
+local KeyStroke = Instance.new("UIStroke") KeyStroke.Parent = KeyBox KeyStroke.Color = Color3.fromRGB(210, 210, 220) KeyStroke.Thickness = 1
+
+local SubmitBtn = Instance.new("TextButton")
+SubmitBtn.Parent = LoginFrame
+SubmitBtn.BackgroundColor3 = current_accent
+SubmitBtn.BorderSizePixel = 0
+SubmitBtn.Position = UDim2.new(0.1, 0, 0, 125)
+SubmitBtn.Size = UDim2.new(0.8, 0, 0, 40)
+SubmitBtn.Font = Enum.Font.GothamBold
+SubmitBtn.Text = "LOGIN"
+SubmitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SubmitBtn.TextSize = 13
+local SubCorner = Instance.new("UICorner") SubCorner.CornerRadius = UDim.new(0, 8) SubCorner.Parent = SubmitBtn
+table.insert(accentDependentBlades, SubmitBtn)
+
+local DiscordBtn = Instance.new("TextButton")
+DiscordBtn.Parent = LoginFrame
+DiscordBtn.BackgroundTransparency = 1
+DiscordBtn.Position = UDim2.new(0.1, 0, 0, 180)
+DiscordBtn.Size = UDim2.new(0.8, 0, 0, 30)
+DiscordBtn.Font = Enum.Font.GothamSemibold
+DiscordBtn.Text = "DISCORD: https://discord.gg/v99gS6cAS"
+DiscordBtn.TextColor3 = color_gray
+DiscordBtn.TextSize = 10
+
+DiscordBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        setclipboard("https://discord.gg/v99gS6cAS")
+    end)
+    showNotification("Discord Link Copied to Clipboard!")
+end)
+
+local BuildMainUI
+
+SubmitBtn.MouseButton1Click:Connect(function()
+    local enteredKey = KeyBox.Text
+    if enteredKey == "" then
+        showNotification("Please enter a key!")
+        return
+    end
+
+    SubmitBtn.Text = "CHECKING..."
+    
+    task.spawn(function()
+        local success, result = pcall(function()
+            local url = "https://wrxlogintracker-default-rtdb.firebaseio.com/keys/" .. enteredKey .. ".json"
+            return HttpService:JSONDecode(game:HttpGet(url))
+        end)
+
+        if success and result then
+            if result.blocked == true then
+                showNotification("This key has been BLOCKED!")
+                SubmitBtn.Text = "LOGIN"
+                return
+            end
+
+            if result.expiry then
+                local year, month, day, hour, min, ampm = result.expiry:match("(%d+)-(%d+)-(%d+) (%d+):(%d+)%s*(%a*)")
+                if year then
+                    hour = tonumber(hour)
+                    min = tonumber(min)
+                    ampm = ampm:upper()
+                    
+                    if ampm == "PM" and hour < 12 then
+                        hour = hour + 12
+                    elseif ampm == "AM" and hour == 12 then
+                        hour = 0
+                    end
+
+                    local expTable = {
+                        year = tonumber(year),
+                        month = tonumber(month),
+                        day = tonumber(day),
+                        hour = hour,
+                        min = min,
+                        sec = 0
+                    }
+                    
+                    local expEpoch = os.time(expTable)
+                    if os.time() > expEpoch then
+                        showNotification("Key has EXPIRED!")
+                        SubmitBtn.Text = "LOGIN"
+                        return
+                    end
+                end
+            end
+
+            local currentUses = tonumber(result.uses) or 0
+            local maxAllowedUses = tonumber(result.maxUses) or 999999
+            if currentUses >= maxAllowedUses then
+                showNotification("Key has reached its Maximum Uses limit!")
+                SubmitBtn.Text = "LOGIN"
+                return
+            end
+
+            pcall(function()
+                local updateUrl = "https://wrxlogintracker-default-rtdb.firebaseio.com/keys/" .. enteredKey .. ".json"
+                local requestFunc = syn and syn.request or http_request or request
+                if requestFunc then
+                    requestFunc({
+                        Url = updateUrl,
+                        Method = "PATCH",
+                        Headers = {["Content-Type"] = "application/json"},
+                        Body = HttpService:JSONEncode({uses = currentUses + 1, lastUser = LocalPlayer.Name})
+                    })
+                end
+            end)
+
+            showNotification("Login Successful! Welcome, " .. LocalPlayer.Name)
+            Tween(LoginFrame, "Size", UDim2.new(0, 0, 0, 0), 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+            task.wait(0.3)
+            LoginFrame:Destroy()
+            
+            BuildMainUI()
+
+        else
+            showNotification("Invalid Key or Database Error!")
+            SubmitBtn.Text = "LOGIN"
+        end
+    end)
+end)
+
+
+-- ==============================
+-- MAIN HUB SCRIPT IMPLEMENTATION
+-- ==============================
+BuildMainUI = function()
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Parent = ScreenGui
+    MainFrame.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
+    MainFrame.BackgroundTransparency = 0.15
+    MainFrame.BorderSizePixel = 0
+    MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    MainFrame.Size = UDim2.new(0, 0, 0, 0)
+    MainFrame.Active = true
+    MainFrame.ClipsDescendants = true
+    MakeDraggableCustom(MainFrame)
+
+    Tween(MainFrame, "Size", UDim2.new(0, 500, 0, 340), 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+
+    local MainCorner = Instance.new("UICorner") MainCorner.CornerRadius = UDim.new(0, 12) MainCorner.Parent = MainFrame
+    local MainStroke = Instance.new("UIStroke") MainStroke.Parent = MainFrame MainStroke.Color = current_accent MainStroke.Thickness = 1.5
+    table.insert(accentDependentStrokes, MainStroke)
+
+    local BladeRing = Instance.new("Frame")
+    BladeRing.Name = "BladeRing"
+    BladeRing.Parent = MainFrame
+    BladeRing.AnchorPoint = Vector2.new(0.5, 0.5)
+    BladeRing.BackgroundTransparency = 1
+    BladeRing.Position = UDim2.new(0.5, 0, 0.5, 0)
+    BladeRing.Size = UDim2.new(1, 20, 1, 20)
+
+    local function CreateBlade(rot)
+        local blade = Instance.new("Frame")
+        blade.Parent = BladeRing
+        blade.AnchorPoint = Vector2.new(0.5, 0.5)
+        blade.BackgroundColor3 = current_accent
+        blade.BorderSizePixel = 0
+        blade.Position = UDim2.new(0.5, 0, 0.5, 0)
+        blade.Size = UDim2.new(0, 4, 0, 16)
+        blade.Rotation = rot
+        local corner = Instance.new("UICorner") corner.CornerRadius = UDim.new(1, 0) corner.Parent = blade
+        table.insert(accentDependentBlades, blade)
+        return blade
+    end
+
+    CreateBlade(0) CreateBlade(90) CreateBlade(180) CreateBlade(270)
+
+    RunService.RenderStepped:Connect(function(dt)
+        if BladeRing and BladeRing.Parent then
+            BladeRing.Rotation = BladeRing.Rotation + (dt * 60)
+        end
+    end)
+
+    local TopBar = Instance.new("Frame")
+    TopBar.Name = "TopBar"
+    TopBar.Parent = MainFrame
+    TopBar.BackgroundColor3 = color_soft_white
+    TopBar.BackgroundTransparency = 0.4
+    TopBar.BorderSizePixel = 0
+    TopBar.Size = UDim2.new(1, 0, 0, 35)
+
+    local TopBarCorner = Instance.new("UICorner") TopBarCorner.CornerRadius = UDim.new(0, 12) TopBarCorner.Parent = TopBar
+
+    local Title = Instance.new("TextLabel")
+    Title.Parent = TopBar
+    Title.BackgroundTransparency = 1
+    Title.Position = UDim2.new(0, 15, 0, 0)
+    Title.Size = UDim2.new(0, 300, 1, 0)
+    Title.Font = Enum.Font.GothamBold
+    Title.Text = "CODEX HUB V1"
+    Title.TextColor3 = color_dark_text
+    Title.TextSize = 13
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+
+    task.spawn(function()
+        local hasShownPopup = false
+        while true do
+            local success, result = pcall(function()
+                local url = "https://wrxlogintracker-default-rtdb.firebaseio.com/announcement.json"
+                return HttpService:JSONDecode(game:HttpGet(url))
+            end)
+            
+            if success and result then
+                if type(result) == "table" then
+                    if result.active == true then
+                        local msg = result.message or "Walang mensahe."
+                        if not hasShownPopup then
+                            hasShownPopup = true
+                            showPopupAnnouncement(msg)
+                        end
+                    else
+                        if hasShownPopup then
+                            hasShownPopup = false
+                            if ScreenGui:FindFirstChild("ActiveAnnouncements") then
+                                for _, child in ipairs(ScreenGui.ActiveAnnouncements:GetChildren()) do
+                                    task.spawn(function()
+                                        if child:IsA("Frame") and child.Name ~= "PopupBg" then
+                                            Tween(child, "Size", UDim2.new(0, 0, 0, 0), 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+                                        end
+                                    end)
+                                end
+                                task.wait(0.2)
+                                ScreenGui.ActiveAnnouncements:ClearAllChildren()
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(4)
+        end
+    end)
+
+    local Sidebar = Instance.new("Frame")
+    Sidebar.Parent = MainFrame
+    Sidebar.BackgroundColor3 = color_soft_white
+    Sidebar.BackgroundTransparency = 0.6
+    Sidebar.BorderSizePixel = 0
+    Sidebar.Position = UDim2.new(0, 0, 0, 35)
+    Sidebar.Size = UDim2.new(0, 130, 1, -35)
+
+    local SidebarList = Instance.new("UIListLayout")
+    SidebarList.Parent = Sidebar
+    SidebarList.SortOrder = Enum.SortOrder.LayoutOrder
+    SidebarList.Padding = UDim.new(0, 4)
+
+    local SidebarPadding = Instance.new("UIPadding")
+    SidebarPadding.PaddingTop = UDim.new(0, 5)
+    SidebarPadding.PaddingLeft = UDim.new(0, 5)
+    SidebarPadding.PaddingRight = UDim.new(0, 5)
+    SidebarPadding.Parent = Sidebar
+
+    local ContainerHolder = Instance.new("Folder")
+    ContainerHolder.Name = "ContainerHolder"
+    ContainerHolder.Parent = MainFrame
+
+    local Tabs = {}
+    local CurrentTab = nil
+
+    local function CreateTab(name)
+        local TabPage = Instance.new("ScrollingFrame")
+        TabPage.Name = name .. "Page"
+        TabPage.Parent = ContainerHolder
+        TabPage.Active = true
+        TabPage.BackgroundTransparency = 1
+        TabPage.BorderSizePixel = 0
+        TabPage.Position = UDim2.new(0, 140, 0, 42)
+        TabPage.Size = UDim2.new(1, -150, 1, -47)
+        TabPage.CanvasSize = UDim2.new(0, 0, 0, 0)
+        TabPage.ScrollBarThickness = 2
+        TabPage.ScrollBarImageColor3 = current_accent
+        TabPage.Visible = false
+        table.insert(accentDependentScrollbars, TabPage)
+
+        local List = Instance.new("UIListLayout")
+        List.Parent = TabPage
+        List.SortOrder = Enum.SortOrder.LayoutOrder
+        List.Padding = UDim.new(0, 6)
+        
+        local PADDING = Instance.new("UIPadding")
+        PADDING.Parent = TabPage
+        PADDING.PaddingTop = UDim.new(0, 2)
+        PADDING.PaddingLeft = UDim.new(0, 2)
+        PADDING.PaddingRight = UDim.new(0, 8)
+
+        List:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            TabPage.CanvasSize = UDim2.new(0, 0, 0, List.AbsoluteContentSize.Y + 20)
+        end)
+
+        local TabBtn = Instance.new("TextButton")
+        TabBtn.Name = name .. "Btn"
+        TabBtn.Parent = Sidebar
+        TabBtn.BackgroundTransparency = 1
+        TabBtn.BorderSizePixel = 0
+        TabBtn.Size = UDim2.new(1, 0, 0, 30)
+        TabBtn.Font = Enum.Font.GothamSemibold
+        TabBtn.Text = name
+        TabBtn.TextColor3 = color_gray
+        TabBtn.TextSize = 11
+
+        local BtnCorner = Instance.new("UICorner") BtnCorner.CornerRadius = UDim.new(0, 6) BtnCorner.Parent = TabBtn
+
+        TabBtn.MouseButton1Click:Connect(function()
+            if CurrentTab == TabPage then return end
+            for _, t in pairs(Tabs) do
+                Tween(t.Btn, "BackgroundTransparency", 1)
+                Tween(t.Btn, "TextColor3", color_gray)
+                t.Page.Visible = false
+            end
+            CurrentTab = TabPage
+            Tween(TabBtn, "BackgroundTransparency", 0.75)
+            Tween(TabBtn, "TextColor3", color_dark_text)
+            TabPage.Visible = true
+        end)
+
+        table.insert(Tabs, {Page = TabPage, Btn = TabBtn})
+        return TabPage
+    end
+
+    local MainTab = CreateTab("MAIN")
+    local PlayersTab = CreateTab("PLAYERS")
+    local VisualTab = CreateTab("VISUALS")
+    local GraphicsTab = CreateTab("GRAPHICS")
+    local BoomboxTab = CreateTab("BOOMBOX")
+    local ColorsTab = CreateTab("COLORS")
+    local AIColorTab = CreateTab("AI COLOR")
+    local SettingsTab = CreateTab("SETTINGS")
+
+    if Tabs[1] then
+        Tabs[1].Page.Visible = true
+        CurrentTab = Tabs[1].Page
+        Tween(Tabs[1].Btn, "BackgroundTransparency", 0.75)
+        Tabs[1].Btn.TextColor3 = color_dark_text
+    end
+
+    -- ==============================
+    -- UPDATED PLAYER LIST TAB IMPLEMENTATION (WITH DETAILED INFO, OLD USERNAME, COUNTRY & TP)
+    -- ==============================
+    local PlayersHeader = Instance.new("TextLabel")
+    PlayersHeader.Size = UDim2.new(1, -10, 0, 20)
+    PlayersHeader.BackgroundTransparency = 1
+    PlayersHeader.TextColor3 = color_dark_text
+    PlayersHeader.TextSize = 11
+    PlayersHeader.Font = Enum.Font.GothamBold
+    PlayersHeader.Text = "SERVER PLAYERS (CLICK INFO / TP):"
+    PlayersHeader.Parent = PlayersTab
+
+    local PlayersContainer = Instance.new("Frame")
+    PlayersContainer.Parent = PlayersTab
+    PlayersContainer.BackgroundTransparency = 1
+    PlayersContainer.Size = UDim2.new(1, -10, 0, 0)
+
+    local PCLayout = Instance.new("UIListLayout")
+    PCLayout.Parent = PlayersContainer
+    PCLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    PCLayout.Padding = UDim.new(0, 6)
+
+    PCLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        PlayersContainer.Size = UDim2.new(1, -10, 0, PCLayout.AbsoluteContentSize.Y)
+    end)
+
+    -- Player Info Modal/Popup Overlay inside UI
+    local PlayerInfoModal = Instance.new("Frame")
+    PlayerInfoModal.Name = "PlayerInfoModal"
+    PlayerInfoModal.Parent = MainFrame
+    PlayerInfoModal.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
+    PlayerInfoModal.BackgroundTransparency = 0.05
+    PlayerInfoModal.BorderSizePixel = 0
+    PlayerInfoModal.AnchorPoint = Vector2.new(0.5, 0.5)
+    PlayerInfoModal.Position = UDim2.new(0.5, 0, 0.5, 0)
+    PlayerInfoModal.Size = UDim2.new(0, 320, 0, 250)
+    PlayerInfoModal.Visible = false
+    PlayerInfoModal.ZIndex = 50
+
+    local pimCorner = Instance.new("UICorner") pimCorner.CornerRadius = UDim.new(0, 10) pimCorner.Parent = PlayerInfoModal
+    local pimStroke = Instance.new("UIStroke") pimStroke.Parent = PlayerInfoModal pimStroke.Color = current_accent pimStroke.Thickness = 1.5
+    table.insert(accentDependentStrokes, pimStroke)
+
+    local PimTitle = Instance.new("TextLabel")
+    PimTitle.Parent = PlayerInfoModal
+    PimTitle.BackgroundTransparency = 1
+    PimTitle.Position = UDim2.new(0, 15, 0, 12)
+    PimTitle.Size = UDim2.new(1, -30, 0, 20)
+    PimTitle.Font = Enum.Font.GothamBold
+    PimTitle.Text = "PLAYER DETAILED INFO"
+    PimTitle.TextColor3 = color_dark_text
+    PimTitle.TextSize = 13
+    PimTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+    local PimAvatar = Instance.new("ImageLabel")
+    PimAvatar.Parent = PlayerInfoModal
+    PimAvatar.BackgroundTransparency = 1
+    PimAvatar.Position = UDim2.new(0, 15, 0, 42)
+    PimAvatar.Size = UDim2.new(0, 50, 0, 50)
+    local pimaCorner = Instance.new("UICorner") pimaCorner.CornerRadius = UDim.new(1, 0) pimaCorner.Parent = PimAvatar
+
+    local PimDetailsBox = Instance.new("TextLabel")
+    PimDetailsBox.Parent = PlayerInfoModal
+    PimDetailsBox.BackgroundTransparency = 1
+    PimDetailsBox.Position = UDim2.new(0, 75, 0, 40)
+    PimDetailsBox.Size = UDim2.new(1, -85, 0, 155)
+    PimDetailsBox.Font = Enum.Font.GothamMedium
+    PimDetailsBox.TextColor3 = color_dark_text
+    PimDetailsBox.TextSize = 10
+    PimDetailsBox.TextXAlignment = Enum.TextXAlignment.Left
+    PimDetailsBox.TextYAlignment = Enum.TextYAlignment.Top
+    PimDetailsBox.TextWrapped = true
+    PimDetailsBox.Text = "Loading details..."
+
+    local ClosePimBtn = Instance.new("TextButton")
+    ClosePimBtn.Parent = PlayerInfoModal
+    ClosePimBtn.BackgroundColor3 = current_accent
+    ClosePimBtn.BorderSizePixel = 0
+    ClosePimBtn.Position = UDim2.new(0.1, 0, 1, -35)
+    ClosePimBtn.Size = UDim2.new(0.8, 0, 0, 26)
+    ClosePimBtn.Font = Enum.Font.GothamBold
+    ClosePimBtn.Text = "CLOSE"
+    ClosePimBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ClosePimBtn.TextSize = 11
+    local cpCorner = Instance.new("UICorner") cpCorner.CornerRadius = UDim.new(0, 6) cpCorner.Parent = ClosePimBtn
+    table.insert(accentDependentBlades, ClosePimBtn)
+
+    ClosePimBtn.MouseButton1Click:Connect(function()
+        PlayerInfoModal.Visible = false
+    end)
+
+    local function refreshPlayerList()
+        for _, child in ipairs(PlayersContainer:GetChildren()) do
+            if child:IsA("Frame") then
+                child:Destroy()
+            end
+        end
+
+        for _, plr in ipairs(Players:GetPlayers()) do
+            local pCard = Instance.new("Frame")
+            pCard.Parent = PlayersContainer
+            pCard.BackgroundColor3 = color_soft_white
+            pCard.BackgroundTransparency = 0.4
+            pCard.BorderSizePixel = 0
+            pCard.Size = UDim2.new(1, 0, 0, 36)
+
+            local pCorner = Instance.new("UICorner") pCorner.CornerRadius = UDim.new(0, 6) pCorner.Parent = pCard
+            local pStroke = Instance.new("UIStroke") pStroke.Parent = pCard pStroke.Color = Color3.fromRGB(210, 210, 220) pStroke.Thickness = 1
+
+            local avatar = Instance.new("ImageLabel")
+            avatar.Parent = pCard
+            avatar.BackgroundTransparency = 1
+            avatar.Position = UDim2.new(0, 4, 0, 4)
+            avatar.Size = UDim2.new(0, 28, 0, 28)
+            pcall(function()
+                avatar.Image = Players:GetUserThumbnailAsync(plr.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+            end)
+            local ac = Instance.new("UICorner") ac.CornerRadius = UDim.new(1, 0) ac.Parent = avatar
+
+            local nameLabel = Instance.new("TextLabel")
+            nameLabel.Parent = pCard
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.Position = UDim2.new(0, 38, 0, 0)
+            nameLabel.Size = UDim2.new(1, -140, 1, 0)
+            nameLabel.Font = Enum.Font.GothamBold
+            nameLabel.Text = plr.Name .. " (@" .. plr.DisplayName .. ")"
+            nameLabel.TextColor3 = color_dark_text
+            nameLabel.TextSize = 10
+            nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+            -- Info Button
+            local infoBtn = Instance.new("TextButton")
+            infoBtn.Parent = pCard
+            infoBtn.BackgroundColor3 = Color3.fromRGB(220, 220, 230)
+            infoBtn.BackgroundTransparency = 0.3
+            infoBtn.Position = UDim2.new(1, -95, 0, 6)
+            infoBtn.Size = UDim2.new(0, 42, 0, 24)
+            infoBtn.Font = Enum.Font.GothamBold
+            infoBtn.Text = "INFO"
+            infoBtn.TextColor3 = color_dark_text
+            infoBtn.TextSize = 9
+            local ibc = Instance.new("UICorner") ibc.CornerRadius = UDim.new(0, 4) ibc.Parent = infoBtn
+
+            infoBtn.MouseButton1Click:Connect(function()
+                PimAvatar.Image = avatar.Image
+                PimDetailsBox.Text = "Fetching full information, country & old usernames..."
+                PlayerInfoModal.Visible = true
+
+                task.spawn(function()
+                    local accountAgeYears = math.floor((plr.AccountAge / 365) * 10) / 10
+                    local charState = (plr.Character and plr.Character:FindFirstChildOfClass("Humanoid") and plr.Character.Humanoid.Health > 0) and "Alive" or "Dead/Respawning"
+                    local teamName = plr.Team and plr.Team.Name or "None"
+                    
+                    -- Detect Country/Region dynamically using LocalizationService
+                    local countryName = "Unknown / Global"
+                    pcall(function()
+                        local cCode = LocalizationService:GetCountryRegionForPlayerAsync(plr)
+                        if cCode and cCode ~= "" then
+                            countryName = cCode
+                        end
+                    end)
+
+                    -- Detect Device Platform (Mobile vs PC/Console)
+                    local deviceType = "PC / Computer"
+                    pcall(function()
+                        -- Check for touch capability or mobile GUI elements
+                        if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+                            deviceType = "Mobile (Phone/Tablet)"
+                        elseif UserInputService.TouchEnabled and UserInputService.KeyboardEnabled then
+                            deviceType = "Tablet / Hybrid"
+                        else
+                            deviceType = "PC / Desktop"
+                        end
+                    end)
+
+                    -- Fetching previous/old usernames using Roblox web API via HttpService/proxy or fallback
+                    local oldUsernamesList = "None / Private"
+                    local success, res = pcall(function()
+                        local url = "https://users.roblox.com/v1/users/" .. plr.UserId .. "/username-history"
+                        local response = game:HttpGet(url)
+                        local decoded = HttpService:JSONDecode(response)
+                        if decoded and decoded.data then
+                            local names = {}
+                            for _, entry in ipairs(decoded.data) do
+                                table.insert(names, entry.name)
+                            end
+                            if #names > 0 then
+                                oldUsernamesList = table.concat(names, ", ")
+                            else
+                                oldUsernamesList = "No previous usernames"
+                            end
+                        end
+                    end)
+
+                    if not success then
+                        oldUsernamesList = "Unavailable (API Restricted)"
+                    end
+
+                    PimDetailsBox.Text = string.format(
+                        "Username: %s\nDisplay Name: %s\nCountry/Region: %s\nDevice: %s\nOld Usernames: %s\nUser ID: %s\nAccount Age: %d days (~%.1f yrs)\nTeam: %s\nStatus: %s",
+                        plr.Name, plr.DisplayName, countryName, deviceType, oldUsernamesList, tostring(plr.UserId), plr.AccountAge, accountAgeYears, teamName, charState
+                    )
+                end)
+            end)
+
+            -- TP Button
+            local tpBtn = Instance.new("TextButton")
+            tpBtn.Parent = pCard
+            tpBtn.BackgroundColor3 = current_accent
+            tpBtn.BorderSizePixel = 0
+            tpBtn.Position = UDim2.new(1, -48, 0, 6)
+            tpBtn.Size = UDim2.new(0, 42, 0, 24)
+            tpBtn.Font = Enum.Font.GothamBold
+            tpBtn.Text = "TP"
+            tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            tpBtn.TextSize = 9
+            local tpc = Instance.new("UICorner") tpc.CornerRadius = UDim.new(0, 4) tpc.Parent = tpBtn
+            table.insert(accentDependentBlades, tpBtn)
+
+            tpBtn.MouseButton1Click:Connect(function()
+                pcall(function()
+                    if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+                        showNotification("Teleported to " .. plr.Name)
+                    else
+                        showNotification("Cannot TP to this player!")
+                    end
+                end)
+            end)
+        end
+    end
+
+    Players.PlayerAdded:Connect(refreshPlayerList)
+    Players.PlayerRemoving:Connect(refreshPlayerList)
+    refreshPlayerList()
+
+    local function AddToggle(tab, text, callback)
+        local toggled = false
+        local btn = Instance.new("TextButton")
+        btn.Parent = tab
+        btn.BackgroundColor3 = color_soft_white
+        btn.BackgroundTransparency = 0.5
+        btn.BorderSizePixel = 0
+        btn.Size = UDim2.new(1, -10, 0, 32)
+        btn.Font = Enum.Font.GothamBold
+        btn.Text = text .. ": OFF"
+        btn.TextColor3 = color_dark_text
+        btn.TextSize = 11
+        btn.AutoButtonColor = false
+        
+        local corner = Instance.new("UICorner") corner.CornerRadius = UDim.new(0, 6) corner.Parent = btn
+        local stroke = Instance.new("UIStroke") stroke.Parent = btn stroke.Color = Color3.fromRGB(220, 220, 225) stroke.Thickness = 1
+
+        btn.MouseButton1Click:Connect(function()
+            toggled = not toggled
+            btn.Text = text .. (toggled and ": ENABLED" or ": OFF")
+            callback(toggled)
+        end)
+        return btn
+    end
+
+    local function AddMaangasSlider(tab, title, minVal, maxVal, defaultVal, callback)
+        local SliderFrame = Instance.new("Frame")
+        SliderFrame.Parent = tab
+        SliderFrame.BackgroundColor3 = color_soft_white
+        SliderFrame.BackgroundTransparency = 0.3
+        SliderFrame.BorderSizePixel = 0
+        SliderFrame.Size = UDim2.new(1, -10, 0, 48)
+
+        local sfCorner = Instance.new("UICorner") sfCorner.CornerRadius = UDim.new(0, 8) sfCorner.Parent = SliderFrame
+        local sfStroke = Instance.new("UIStroke") sfStroke.Parent = SliderFrame sfStroke.Color = Color3.fromRGB(210, 210, 220) sfStroke.Thickness = 1
+
+        local TitleLabel = Instance.new("TextLabel")
+        TitleLabel.Parent = SliderFrame
+        TitleLabel.BackgroundTransparency = 1
+        TitleLabel.Position = UDim2.new(0, 10, 0, 4)
+        TitleLabel.Size = UDim2.new(1, -20, 0, 18)
+        TitleLabel.Font = Enum.Font.GothamBold
+        TitleLabel.Text = title .. ": " .. defaultVal
+        TitleLabel.TextColor3 = color_dark_text
+        TitleLabel.TextSize = 11
+        TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+        local SliderBar = Instance.new("Frame")
+        SliderBar.Parent = SliderFrame
+        SliderBar.BackgroundColor3 = Color3.fromRGB(220, 220, 230)
+        SliderBar.BorderSizePixel = 0
+        SliderBar.Position = UDim2.new(0, 10, 0, 28)
+        SliderBar.Size = UDim2.new(1, -20, 0, 8)
+        local sbCorner = Instance.new("UICorner") sbCorner.CornerRadius = UDim.new(1, 0) sbCorner.Parent = SliderBar
+
+        local SliderFill = Instance.new("Frame")
+        SliderFill.Parent = SliderBar
+        SliderFill.BackgroundColor3 = current_accent
+        SliderFill.BorderSizePixel = 0
+        SliderFill.Size = UDim2.new((defaultVal - minVal) / (maxVal - minVal), 0, 1, 0)
+        local sfFillCorner = Instance.new("UICorner") sfFillCorner.CornerRadius = UDim.new(1, 0) sfFillCorner.Parent = SliderFill
+        table.insert(accentDependentBlades, SliderFill)
+
+        local SliderKnob = Instance.new("Frame")
+        SliderKnob.Parent = SliderFill
+        SliderKnob.AnchorPoint = Vector2.new(0.5, 0.5)
+        SliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        SliderKnob.BorderSizePixel = 0
+        SliderKnob.Position = UDim2.new(1, 0, 0.5, 0)
+        SliderKnob.Size = UDim2.new(0, 14, 0, 14)
+        local skCorner = Instance.new("UICorner") skCorner.CornerRadius = UDim.new(1, 0) skCorner.Parent = SliderKnob
+        local skStroke = Instance.new("UIStroke") skStroke.Parent = SliderKnob skStroke.Color = current_accent skStroke.Thickness = 2
+        table.insert(accentDependentStrokes, skStroke)
+
+        local dragging = false
+        local function updateValue(input)
+            local pos = math.clamp((input.Position.X - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X, 0, 1)
+            local val = math.floor(minVal + ((maxVal - minVal) * pos))
+            SliderFill.Size = UDim2.new(pos, 0, 1, 0)
+            TitleLabel.Text = title .. ": " .. val
+            callback(val)
+        end
+
+        SliderBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                updateValue(input)
+            end
+        end)
+
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                updateValue(input)
+            end
+        end)
+
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+
+        return SliderFrame
+    end
+
+    local function AddTextBox(tab, placeholder, defaultText, callback)
+        local box = Instance.new("TextBox")
+        box.Parent = tab
+        box.BackgroundColor3 = color_soft_white
+        box.BackgroundTransparency = 0.3
+        box.BorderSizePixel = 0
+        box.Size = UDim2.new(1, -10, 0, 32)
+        box.Font = Enum.Font.GothamBold
+        box.PlaceholderText = placeholder
+        box.Text = defaultText
+        box.TextColor3 = color_dark_text
+        box.PlaceholderColor3 = color_gray
+        box.TextSize = 11
+        
+        local corner = Instance.new("UICorner") corner.CornerRadius = UDim.new(0, 6) corner.Parent = box
+        local stroke = Instance.new("UIStroke") stroke.Parent = box stroke.Color = Color3.fromRGB(220, 220, 225) stroke.Thickness = 1
+
+        box.FocusLost:Connect(function()
+            callback(box.Text)
+        end)
+        return box
+    end
+
+    local ProfileCard = Instance.new("Frame")
+    ProfileCard.Name = "ProfileCard"
+    ProfileCard.Parent = MainTab
+    ProfileCard.BackgroundColor3 = color_soft_white
+    ProfileCard.BackgroundTransparency = 0.3
+    ProfileCard.BorderSizePixel = 0
+    ProfileCard.Size = UDim2.new(1, -10, 0, 100)
+
+    local pcCorner = Instance.new("UICorner") pcCorner.CornerRadius = UDim.new(0, 8) pcCorner.Parent = ProfileCard
+    local pcStroke = Instance.new("UIStroke") pcStroke.Parent = ProfileCard pcStroke.Color = Color3.fromRGB(210, 210, 220) pcStroke.Thickness = 1
+
+    local AvatarImg = Instance.new("ImageLabel")
+    AvatarImg.Name = "AvatarImg"
+    AvatarImg.Parent = ProfileCard
+    AvatarImg.BackgroundTransparency = 1
+    AvatarImg.Position = UDim2.new(0, 8, 0, 8)
+    AvatarImg.Size = UDim2.new(0, 58, 0, 58)
+    AvatarImg.Image = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+    local aiCorner = Instance.new("UICorner") aiCorner.CornerRadius = UDim.new(1, 0) aiCorner.Parent = AvatarImg
+
+    local ProfileName = Instance.new("TextLabel")
+    ProfileName.Name = "ProfileName"
+    ProfileName.Parent = ProfileCard
+    ProfileName.BackgroundTransparency = 1
+    ProfileName.Position = UDim2.new(0, 75, 0, 10)
+    ProfileName.Size = UDim2.new(1, -80, 0, 20)
+    ProfileName.Font = Enum.Font.GothamBold
+    ProfileName.Text = LocalPlayer.Name .. " (@" .. LocalPlayer.DisplayName .. ")"
+    ProfileName.TextColor3 = color_dark_text
+    ProfileName.TextSize = 12
+    ProfileName.TextXAlignment = Enum.TextXAlignment.Left
+
+    local ProfileID = Instance.new("TextLabel")
+    ProfileID.Name = "ProfileID"
+    ProfileID.Parent = ProfileCard
+    ProfileID.BackgroundTransparency = 1
+    ProfileID.Position = UDim2.new(0, 75, 0, 30)
+    ProfileID.Size = UDim2.new(1, -80, 0, 18)
+    ProfileID.Font = Enum.Font.GothamMedium
+    ProfileID.Text = "ID: " .. LocalPlayer.UserId
+    ProfileID.TextColor3 = color_gray
+    ProfileID.TextSize = 11
+    ProfileID.TextXAlignment = Enum.TextXAlignment.Left
+
+    local AccountAgeLabel = Instance.new("TextLabel")
+    AccountAgeLabel.Name = "AccountAgeLabel"
+    AccountAgeLabel.Parent = ProfileCard
+    AccountAgeLabel.BackgroundTransparency = 1
+    AccountAgeLabel.Position = UDim2.new(0, 75, 0, 48)
+    AccountAgeLabel.Size = UDim2.new(1, -80, 0, 18)
+    AccountAgeLabel.Font = Enum.Font.GothamMedium
+    AccountAgeLabel.Text = "Account Age: " .. LocalPlayer.AccountAge .. " days"
+    AccountAgeLabel.TextColor3 = color_gray
+    AccountAgeLabel.TextSize = 11
+    AccountAgeLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    local OwnerTag = Instance.new("TextLabel")
+    OwnerTag.Name = "OwnerTag"
+    OwnerTag.Parent = ProfileCard
+    OwnerTag.BackgroundTransparency = 1
+    OwnerTag.Position = UDim2.new(0, 75, 0, 66)
+    OwnerTag.Size = UDim2.new(1, -80, 0, 20)
+    OwnerTag.Font = Enum.Font.GothamBold
+    OwnerTag.Text = "OWNER: YATAKI HANZ"
+    OwnerTag.TextColor3 = Color3.fromRGB(0, 0, 0)
+    OwnerTag.TextSize = 11
+    OwnerTag.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- ==============================
+    -- LAHAT NG COLOR LIST (COLORS TAB)
+    -- ==============================
+    local ColorHeader = Instance.new("TextLabel")
+    ColorHeader.Size = UDim2.new(1, -10, 0, 20)
+    ColorHeader.BackgroundTransparency = 1
+    ColorHeader.TextColor3 = color_dark_text
+    ColorHeader.TextSize = 11
+    ColorHeader.Font = Enum.Font.GothamBold
+    ColorHeader.Text = "ALL COLOR IS HERE  (CHOOSE YOU WANT):"
+    ColorHeader.Parent = ColorsTab
+
+    local allColorsList = {
+        {"White", Color3.fromRGB(255, 255, 255)},
+        {"Black", Color3.fromRGB(0, 0, 0)},
+        {"Red", Color3.fromRGB(255, 0, 0)},
+        {"Green", Color3.fromRGB(0, 255, 0)},
+        {"Blue", Color3.fromRGB(0, 0, 255)},
+        {"Electric Blue", Color3.fromRGB(0, 229, 255)},
+        {"Acid Green", Color3.fromRGB(100, 255, 0)},
+        {"Blood Red", Color3.fromRGB(255, 50, 50)},
+        {"Yellow", Color3.fromRGB(255, 255, 0)},
+        {"Cyan", Color3.fromRGB(0, 255, 255)},
+        {"Magenta", Color3.fromRGB(255, 0, 255)},
+        {"Pink", Color3.fromRGB(255, 192, 203)},
+        {"Hot Pink", Color3.fromRGB(255, 105, 180)},
+        {"Purple", Color3.fromRGB(128, 0, 128)},
+        {"Violet", Color3.fromRGB(238, 130, 238)},
+        {"Indigo", Color3.fromRGB(75, 0, 130)},
+        {"Orange", Color3.fromRGB(255, 165, 0)},
+        {"Dark Orange", Color3.fromRGB(255, 140, 0)},
+        {"Gold", Color3.fromRGB(255, 215, 0)},
+        {"Silver", Color3.fromRGB(192, 192, 192)},
+        {"Gray", Color3.fromRGB(128, 128, 128)},
+        {"Dark Gray", Color3.fromRGB(64, 64, 64)},
+        {"Light Gray", Color3.fromRGB(211, 211, 211)},
+        {"Brown", Color3.fromRGB(165, 42, 42)},
+        {"Chocolate", Color3.fromRGB(210, 105, 30)},
+        {"Maroon", Color3.fromRGB(128, 0, 0)},
+        {"Olive", Color3.fromRGB(128, 128, 0)},
+        {"Lime", Color3.fromRGB(0, 255, 0)},
+        {"Teal", Color3.fromRGB(0, 128, 128)},
+        {"Navy", Color3.fromRGB(0, 0, 128)},
+        {"Sky Blue", Color3.fromRGB(135, 206, 235)},
+        {"Midnight Blue", Color3.fromRGB(25, 25, 112)},
+        {"Turquoise", Color3.fromRGB(64, 224, 208)},
+        {"Mint", Color3.fromRGB(189, 252, 201)},
+        {"Lavender", Color3.fromRGB(230, 230, 250)},
+        {"Coral", Color3.fromRGB(255, 127, 80)},
+        {"Salmon", Color3.fromRGB(250, 128, 114)},
+        {"Crimson", Color3.fromRGB(220, 20, 60)},
+        {"Plum", Color3.fromRGB(221, 160, 221)},
+        {"Orchid", Color3.fromRGB(218, 112, 214)},
+        {"Chartreuse", Color3.fromRGB(127, 255, 0)},
+        {"Spring Green", Color3.fromRGB(0, 255, 127)},
+        {"Aquamarine", Color3.fromRGB(127, 255, 212)},
+        {"Azure", Color3.fromRGB(240, 248, 255)},
+        {"Beige", Color3.fromRGB(245, 245, 225)},
+        {"Tan", Color3.fromRGB(210, 180, 140)},
+        {"Khaki", Color3.fromRGB(240, 230, 140)},
+        {"Peach", Color3.fromRGB(255, 229, 180)},
+        {"Rose", Color3.fromRGB(255, 228, 225)},
+        {"Amber", Color3.fromRGB(255, 191, 0)},
+        {"Emerald", Color3.fromRGB(80, 200, 120)},
+        {"Ruby", Color3.fromRGB(224, 17, 95)},
+        {"Sapphire", Color3.fromRGB(15, 82, 186)},
+        {"Topaz", Color3.fromRGB(255, 200, 124)},
+        {"Amethyst", Color3.fromRGB(153, 102, 204)},
+        {"Neon Yellow", Color3.fromRGB(255, 255, 0)},
+        {"Neon Purple", Color3.fromRGB(180, 0, 255)},
+        {"Neon Green", Color3.fromRGB(57, 255, 20)}
+    }
+
+    for _, colData in ipairs(allColorsList) do
+        local cName, cColor = colData[1], colData[2]
+        local btn = Instance.new("TextButton")
+        btn.Parent = ColorsTab
+        btn.BackgroundColor3 = color_soft_white
+        btn.BackgroundTransparency = 0.5
+        btn.BorderSizePixel = 0
+        btn.Size = UDim2.new(1, -10, 0, 30)
+        btn.Font = Enum.Font.GothamBold
+        btn.Text = "Theme: " .. cName
+        btn.TextColor3 = cColor
+        btn.TextSize = 11
+        btn.AutoButtonColor = false
+        
+        local corner = Instance.new("UICorner") corner.CornerRadius = UDim.new(0, 6) corner.Parent = btn
+        local stroke = Instance.new("UIStroke") stroke.Parent = btn stroke.Color = cColor stroke.Thickness = 1.2
+
+        btn.MouseButton1Click:Connect(function()
+            UpdateAllAccents(cColor)
+            showNotification("Theme Set to: " .. cName)
+        end)
+    end
+
+    -- ==============================
+    -- AI COLOR TAB SYSTEM (WITH CHAT & COPY BUTTON)
+    -- ==============================
+    local AIHeader = Instance.new("TextLabel")
+    AIHeader.Size = UDim2.new(1, -10, 0, 25)
+    AIHeader.BackgroundTransparency = 1
+    AIHeader.TextColor3 = color_dark_text
+    AIHeader.TextSize = 12
+    AIHeader.Font = Enum.Font.GothamBold
+    AIHeader.Text = "AI COLOR ASSISTANT"
+    AIHeader.Parent = AIColorTab
+
+    local AIChatScroll = Instance.new("ScrollingFrame")
+    AIChatScroll.Name = "AIChatScroll"
+    AIChatScroll.Parent = AIColorTab
+    AIChatScroll.BackgroundColor3 = color_soft_white
+    AIChatScroll.BackgroundTransparency = 0.4
+    AIChatScroll.BorderSizePixel = 0
+    AIChatScroll.Size = UDim2.new(1, -10, 0, 180)
+    AIChatScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    AIChatScroll.ScrollBarThickness = 2
+
+    local aicCorner = Instance.new("UICorner") aicCorner.CornerRadius = UDim.new(0, 8) aicCorner.Parent = AIChatScroll
+    local aicStroke = Instance.new("UIStroke") aicStroke.Parent = AIChatScroll aicStroke.Color = Color3.fromRGB(210, 210, 220) aicStroke.Thickness = 1
+
+    local AIChatLayout = Instance.new("UIListLayout")
+    AIChatLayout.Parent = AIChatScroll
+    AIChatLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    AIChatLayout.Padding = UDim.new(0, 6)
+
+    local AIChatPadding = Instance.new("UIPadding")
+    AIChatPadding.Parent = AIChatScroll
+    AIChatPadding.PaddingTop = UDim.new(0, 8)
+    AIChatPadding.PaddingLeft = UDim.new(0, 8)
+    AIChatPadding.PaddingRight = UDim.new(0, 8)
+
+    AIChatLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        AIChatScroll.CanvasSize = UDim2.new(0, 0, 0, AIChatLayout.AbsoluteContentSize.Y + 20)
+    end)
+
+    local InputRow = Instance.new("Frame")
+    InputRow.Parent = AIColorTab
+    InputRow.BackgroundTransparency = 1
+    InputRow.Size = UDim2.new(1, -10, 0, 38)
+
+    local TypeColorBox = Instance.new("TextBox")
+    TypeColorBox.Parent = InputRow
+    TypeColorBox.BackgroundColor3 = color_soft_white
+    TypeColorBox.BackgroundTransparency = 0.2
+    TypeColorBox.BorderSizePixel = 0
+    TypeColorBox.Size = UDim2.new(1, -70, 1, 0)
+    TypeColorBox.Font = Enum.Font.GothamBold
+    TypeColorBox.PlaceholderText = "Type color you want..."
+    TypeColorBox.Text = ""
+    TypeColorBox.TextColor3 = color_dark_text
+    TypeColorBox.PlaceholderColor3 = color_gray
+    TypeColorBox.TextSize = 11
+
+    local tcbCorner = Instance.new("UICorner") tcbCorner.CornerRadius = UDim.new(0, 8) tcbCorner.Parent = TypeColorBox
+    local tcbStroke = Instance.new("UIStroke") tcbStroke.Parent = TypeColorBox tcbStroke.Color = Color3.fromRGB(210, 210, 220) tcbStroke.Thickness = 1
+
+    local SendColorBtn = Instance.new("TextButton")
+    SendColorBtn.Parent = InputRow
+    SendColorBtn.BackgroundColor3 = current_accent
+    SendColorBtn.BorderSizePixel = 0
+    SendColorBtn.Position = UDim2.new(1, -60, 0, 0)
+    SendColorBtn.Size = UDim2.new(0, 60, 1, 0)
+    SendColorBtn.Font = Enum.Font.GothamBold
+    SendColorBtn.Text = "SEND"
+    SendColorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    SendColorBtn.TextSize = 11
+
+    local scbCorner = Instance.new("UICorner") scbCorner.CornerRadius = UDim.new(0, 8) scbCorner.Parent = SendColorBtn
+    table.insert(accentDependentBlades, SendColorBtn)
+
+    local function addAIChatMessage(sender, msgText, copyValue)
+        local msgFrame = Instance.new("Frame")
+        msgFrame.Parent = AIChatScroll
+        msgFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        msgFrame.BackgroundTransparency = 0.3
+        msgFrame.Size = UDim2.new(1, 0, 0, 32)
+        msgFrame.BorderSizePixel = 0
+
+        local mfCorner = Instance.new("UICorner") mfCorner.CornerRadius = UDim.new(0, 6) mfCorner.Parent = msgFrame
+        local mfStroke = Instance.new("UIStroke") mfStroke.Parent = msgFrame mfStroke.Color = Color3.fromRGB(220, 220, 225) mfStroke.Thickness = 1
+
+        local chatLabel = Instance.new("TextLabel")
+        chatLabel.Parent = msgFrame
+        chatLabel.BackgroundTransparency = 1
+        chatLabel.Position = UDim2.new(0, 8, 0, 0)
+        chatLabel.Size = UDim2.new(1, -65, 1, 0)
+        chatLabel.Font = Enum.Font.GothamSemibold
+        chatLabel.Text = sender .. ": " .. msgText
+        chatLabel.TextColor3 = color_dark_text
+        chatLabel.TextSize = 10
+        chatLabel.TextXAlignment = Enum.TextXAlignment.Left
+        chatLabel.TextWrapped = true
+
+        if copyValue then
+            local copyBtn = Instance.new("TextButton")
+            copyBtn.Parent = msgFrame
+            copyBtn.BackgroundColor3 = current_accent
+            copyBtn.BorderSizePixel = 0
+            copyBtn.Position = UDim2.new(1, -55, 0, 4)
+            copyBtn.Size = UDim2.new(0, 50, 0, 24)
+            copyBtn.Font = Enum.Font.GothamBold
+            copyBtn.Text = "COPY"
+            copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            local ShapeCorner = Instance.new("UICorner") ShapeCorner.CornerRadius = UDim.new(0, 4) ShapeCorner.Parent = copyBtn
+            table.insert(accentDependentBlades, copyBtn)
+
+            copyBtn.MouseButton1Click:Connect(function()
+                pcall(function()
+                    setclipboard(copyValue)
+                end)
+                showNotification("Copied to clipboard: " .. copyValue)
+            end)
+        end
+    end
+
+    addAIChatMessage("AI", "Hello! Type any color you want in the box below (e.g. white, black, neon blue).", nil)
+
+    SendColorBtn.MouseButton1Click:Connect(function()
+        local inputTxt = TypeColorBox.Text
+        if inputTxt == "" then return end
+
+        addAIChatMessage("You", inputTxt, nil)
+        TypeColorBox.Text = ""
+
+        task.spawn(function()
+            task.wait(0.4)
+            local query = inputTxt:lower()
+            local matchedColor = nil
+            local foundName = "Custom Color"
+
+            for _, col in ipairs(allColorsList) do
+                if col[1]:lower() == query or col[1]:lower():find(query) then
+                    matchedColor = col[2]
+                    foundName = col[1]
+                    break
+                end
+            end
+
+            if not matchedColor then
+                if query:find("red") then matchedColor = Color3.fromRGB(255, 0, 0) foundName = "Red Variant"
+                elseif query:find("blue") then matchedColor = Color3.fromRGB(0, 0, 255) foundName = "Blue Variant"
+                elseif query:find("green") then matchedColor = Color3.fromRGB(0, 255, 0) foundName = "Green Variant"
+                elseif query:find("yellow") then matchedColor = Color3.fromRGB(255, 255, 0) foundName = "Yellow Variant"
+                elseif query:find("dark") then matchedColor = Color3.fromRGB(40, 40, 40) foundName = "Dark Shade"
+                else matchedColor = Color3.fromRGB(200, 200, 200) foundName = "Generated Color"
+                end
+            end
+
+            local rgbString = math.floor(matchedColor.R * 255) .. ", " .. math.floor(matchedColor.G * 255) .. ", " .. math.floor(matchedColor.B * 255)
+            addAIChatMessage("AI", foundName .. " RGB: " .. rgbString, rgbString)
+            UpdateAllAccents(matchedColor)
+            showNotification("AI applied color: " .. foundName)
+        end)
+    end)
+
+    TypeColorBox.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            SendColorBtn:CaptureFocus()
+        end
+    end)
+
+    -- ==============================
+    -- WORKING ESP PLAYER (BOX & NAME WITH FLOATING BUTTON & ACCENT SYNC)
+    -- ==============================
+    local espActive = false
+    local espBtnActive = false
+    local espDrawings = {}
+
+    local EspFloatingBtn = Instance.new("TextButton")
+    EspFloatingBtn.Name = "EspFloatingBtn"
+    EspFloatingBtn.Parent = ScreenGui
+    EspFloatingBtn.BackgroundColor3 = color_soft_white
+    EspFloatingBtn.BackgroundTransparency = 0.1
+    EspFloatingBtn.Position = UDim2.new(0.65, 0, 0.26, 0)
+    EspFloatingBtn.Size = UDim2.new(0, 130, 0, 38)
+    EspFloatingBtn.Font = Enum.Font.GothamBold
+    EspFloatingBtn.Text = "ESP: OFF"
+    EspFloatingBtn.TextColor3 = color_dark_text
+    EspFloatingBtn.TextSize = 11
+    EspFloatingBtn.Visible = false
+    EspFloatingBtn.Active = true
+    MakeDraggableCustom(EspFloatingBtn)
+    local espCorner = Instance.new("UICorner") espCorner.CornerRadius = UDim.new(0, 8) espCorner.Parent = EspFloatingBtn
+    local espStroke = Instance.new("UIStroke") espStroke.Parent = EspFloatingBtn espStroke.Color = Color3.fromRGB(200, 200, 210) espStroke.Thickness = 1.5
+
+    EspFloatingBtn.MouseButton1Click:Connect(function()
+        espBtnActive = not espBtnActive
+        EspFloatingBtn.Text = espBtnActive and "ESP: ON" or "ESP: OFF"
+        showNotification(espBtnActive and "ESP Floating ON" or "ESP Floating OFF")
+    end)
+
+    AddToggle(VisualTab, "PLAYER ESP (W/ FLOAT)", function(state)
+        espActive = state
+        EspFloatingBtn.Visible = state
+        EspFloatingBtn.Text = state and "ESP: ON" or "ESP: OFF"
+        if not state then
+            espBtnActive = false
+            EspFloatingBtn.Text = "ESP: OFF"
+            for _, data in pairs(espDrawings) do
+                if data.Box then data.Box:Remove() end
+                if data.Name then data.Name:Remove() end
+            end
+            espDrawings = {}
+            accentDependentDrawings = {}
+        end
+        showNotification(state and "Player ESP Enabled & Floating Button Shown" or "Player ESP Disabled")
+    end)
+
+    RunService.RenderStepped:Connect(function()
+        if espActive and espBtnActive then
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer then
+                    if not espDrawings[player] then
+                        local box = Drawing.new("Square")
+                        box.Visible = false
+                        box.Color = current_accent
+                        box.Thickness = 1.5
+                        box.Filled = false
+                        
+                        table.insert(accentDependentDrawings, box)
+
+                        local nameText = Drawing.new("Text")
+                        nameText.Visible = false
+                        nameText.Color = Color3.fromRGB(255, 255, 255)
+                        nameText.Size = 13
+                        nameText.Center = true
+                        nameText.Outline = true
+
+                        espDrawings[player] = {Box = box, Name = nameText}
+                    end
+
+                    local data = espDrawings[player]
+                    local character = player.Character
+                    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+                    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+                    if character and hrp and humanoid and humanoid.Health > 0 then
+                        local vector, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                        if onScreen then
+                            local head = character:FindFirstChild("Head")
+                            local headVector = head and Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0)) or vector
+                            local legVector = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+
+                            local height = math.abs(headVector.Y - legVector.Y)
+                            local width = height / 2
+
+                            data.Box.Size = Vector2.new(width, height)
+                            data.Box.Position = Vector2.new(vector.X - width / 2, headVector.Y)
+                            data.Box.Visible = true
+
+                            data.Name.Text = player.Name
+                            data.Name.Position = Vector2.new(vector.X, headVector.Y - 18)
+                            data.Name.Visible = true
+                        else
+                            data.Box.Visible = false
+                            data.Name.Visible = false
+                        end
+                    else
+                        data.Box.Visible = false
+                        data.Name.Visible = false
+                    end
+                end
+            end
+        else
+            for _, data in pairs(espDrawings) do
+                if data.Box then data.Box.Visible = false end
+                if data.Name then data.Name.Visible = false end
+            end
+        end
+    end)
+
+    local speedActive = false
+    local speedVal = 20
+
+    local SpeedFloatingBtn = Instance.new("TextButton")
+    SpeedFloatingBtn.Name = "SpeedFloatingBtn"
+    SpeedFloatingBtn.Parent = ScreenGui
+    SpeedFloatingBtn.BackgroundColor3 = color_soft_white
+    SpeedFloatingBtn.BackgroundTransparency = 0.1
+    SpeedFloatingBtn.Position = UDim2.new(0.65, 0, 0.1, 0)
+    SpeedFloatingBtn.Size = UDim2.new(0, 130, 0, 38)
+    SpeedFloatingBtn.Font = Enum.Font.GothamBold
+    SpeedFloatingBtn.Text = "SPEED: OFF"
+    SpeedFloatingBtn.TextColor3 = color_dark_text
+    SpeedFloatingBtn.TextSize = 11
+    SpeedFloatingBtn.Visible = false
+    SpeedFloatingBtn.Active = true
+    MakeDraggableCustom(SpeedFloatingBtn)
+    local sCorner = Instance.new("UICorner") sCorner.CornerRadius = UDim.new(0, 8) sCorner.Parent = SpeedFloatingBtn
+    local sStroke = Instance.new("UIStroke") sStroke.Parent = SpeedFloatingBtn sStroke.Color = Color3.fromRGB(200, 200, 210) sStroke.Thickness = 1.5
+
+    SpeedFloatingBtn.MouseButton1Click:Connect(function()
+        speedActive = not speedActive
+        SpeedFloatingBtn.Text = speedActive and "SPEED: ON" or "SPEED: OFF"
+        showNotification(speedActive and "Speed Floating Enabled" or "Speed Floating Disabled")
+    end)
+
+    AddToggle(MainTab, "SPEED (W/ FLOAT)", function(state)
+        speedActive = state
+        SpeedFloatingBtn.Visible = state
+        SpeedFloatingBtn.Text = state and "SPEED: ON" or "SPEED: OFF"
+        showNotification(state and "Speed Enabled & Floating Button Shown" or "Speed Disabled")
+    end)
+
+    AddMaangasSlider(MainTab, "SPEED POWER", 10, 100, 20, function(val)
+        speedVal = val
+    end)
+
+    RunService.RenderStepped:Connect(function(dt)
+        if speedActive and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local humanoid = LocalPlayer.Character.Humanoid
+            local rootPart = LocalPlayer.Character.HumanoidRootPart
+            if humanoid.MoveDirection.Magnitude > 0 then
+                rootPart.CFrame = rootPart.CFrame + (humanoid.MoveDirection * speedVal * dt)
+            end
+        end
+    end)
+
+    local autoJumpActive = false
+    local jumpBtnActive = false
+
+        local JumpFloatingBtn = Instance.new("TextButton")
+    JumpFloatingBtn.Name = "JumpFloatingBtn"
+    JumpFloatingBtn.Parent = ScreenGui
+    JumpFloatingBtn.BackgroundColor3 = color_soft_white
+    JumpFloatingBtn.BackgroundTransparency = 0.1
+    JumpFloatingBtn.Position = UDim2.new(0.5, 0, 0.1, 0)
+    JumpFloatingBtn.Size = UDim2.new(0, 130, 0, 38)
+    JumpFloatingBtn.Font = Enum.Font.GothamBold
+    JumpFloatingBtn.Text = "JUMP: OFF"
+    JumpFloatingBtn.TextColor3 = color_dark_text
+    JumpFloatingBtn.TextSize = 11
+    JumpFloatingBtn.Visible = false
+    JumpFloatingBtn.Active = true
+    MakeDraggableCustom(JumpFloatingBtn)
+    local jCorner = Instance.new("UICorner") jCorner.CornerRadius = UDim.new(0, 8) jCorner.Parent = JumpFloatingBtn
+    local jStroke = Instance.new("UIStroke") jStroke.Parent = JumpFloatingBtn jStroke.Color = Color3.fromRGB(200, 200, 210) jStroke.Thickness = 1.5
+
+    JumpFloatingBtn.MouseButton1Click:Connect(function()
+        jumpBtnActive = not jumpBtnActive
+        JumpFloatingBtn.Text = jumpBtnActive and "JUMP: ON" or "JUMP: OFF"
+        showNotification(jumpBtnActive and "Auto Jump Floating ON" or "Auto Jump Floating OFF")
+    end)
+
+    local SelectedEmoteID = 14
+
+    local EmoteFloatingBtn = Instance.new("TextButton")
+    EmoteFloatingBtn.Name = "EmoteFloatingBtn"
+    EmoteFloatingBtn.Parent = ScreenGui
+    EmoteFloatingBtn.BackgroundColor3 = color_soft_white
+    EmoteFloatingBtn.BackgroundTransparency = 0.1
+    EmoteFloatingBtn.Position = UDim2.new(0.65, 0, 0.18, 0)
+    EmoteFloatingBtn.Size = UDim2.new(0, 130, 0, 38)
+    EmoteFloatingBtn.Font = Enum.Font.GothamBold
+    EmoteFloatingBtn.Text = "EMOTE"
+    EmoteFloatingBtn.TextColor3 = color_dark_text
+    EmoteFloatingBtn.TextSize = 11
+    EmoteFloatingBtn.Visible = false
+    EmoteFloatingBtn.Active = true
+    MakeDraggableCustom(EmoteFloatingBtn)
+    local eCorner = Instance.new("UICorner") eCorner.CornerRadius = UDim.new(0, 8) eCorner.Parent = EmoteFloatingBtn
+    local eStroke = Instance.new("UIStroke") eStroke.Parent = EmoteFloatingBtn eStroke.Color = Color3.fromRGB(200, 200, 210) eStroke.Thickness = 1.5
+
+    local EmotePanel = Instance.new("ScrollingFrame")
+    EmotePanel.Name = "EmotePanel"
+    EmotePanel.Parent = EmoteFloatingBtn
+    EmotePanel.BackgroundColor3 = color_soft_white
+    EmotePanel.BackgroundTransparency = 0.1
+    EmotePanel.Position = UDim2.new(0, 0, 1, 6)
+    EmotePanel.Size = UDim2.new(0, 130, 0, 180)
+    EmotePanel.CanvasSize = UDim2.new(0, 0, 0, 180)
+    EmotePanel.ScrollBarThickness = 2
+    EmotePanel.Visible = false
+    EmotePanel.Active = true
+    local epCorner = Instance.new("UICorner") epCorner.CornerRadius = UDim.new(0, 10) epCorner.Parent = EmotePanel
+    local epStroke = Instance.new("UIStroke") epStroke.Parent = EmotePanel epStroke.Color = Color3.fromRGB(200, 200, 210) epStroke.Thickness = 1.5
+
+    local EmoteListLayout = Instance.new("UIListLayout")
+    EmoteListLayout.Parent = EmotePanel
+    EmoteListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    EmoteListLayout.Padding = UDim.new(0, 5)
+    EmoteListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+    local EmoteListPadding = Instance.new("UIPadding")
+    EmoteListPadding.Parent = EmotePanel
+    EmoteListPadding.PaddingTop = UDim.new(0, 8)
+    EmoteListPadding.PaddingLeft = UDim.new(0, 8)
+    EmoteListPadding.PaddingRight = UDim.new(0, 8)
+
+    -- [AUTO-SCROLL / CANVAS SIZE FIX]
+    EmoteListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        EmotePanel.CanvasSize = UDim2.new(0, 0, 0, EmoteListLayout.AbsoluteContentSize.Y + 20)
+    end)
+
+    local emotePanelOpen = false
+    EmoteFloatingBtn.MouseButton1Click:Connect(function()
+        emotePanelOpen = not emotePanelOpen
+        EmotePanel.Visible = emotePanelOpen
+    end)
+
+    local function createFloatingEmoteChoice(name, id)
+        local choiceBtn = Instance.new("TextButton")
+        choiceBtn.Parent = EmotePanel
+        choiceBtn.BackgroundColor3 = Color3.fromRGB(230, 230, 235)
+        choiceBtn.BackgroundTransparency = 0.3
+        choiceBtn.Size = UDim2.new(1, 0, 0, 24)
+        choiceBtn.Font = Enum.Font.GothamBold
+        choiceBtn.Text = name
+        choiceBtn.TextColor3 = color_dark_text
+        choiceBtn.TextSize = 10
+        local cCorner = Instance.new("UICorner") cCorner.CornerRadius = UDim.new(0, 6) cCorner.Parent = choiceBtn
+        local cStroke = Instance.new("UIStroke") cStroke.Parent = choiceBtn cStroke.Color = Color3.fromRGB(200, 200, 210) cStroke.Thickness = 1
+        
+        choiceBtn.MouseButton1Click:Connect(function()
+            SelectedEmoteID = id
+            emotePanelOpen = false
+            EmotePanel.Visible = false
+            showNotification("Emote Set: " .. name)
+        end)
+    end
+    
+    createFloatingEmoteChoice("Goofy", 32)
+    createFloatingEmoteChoice("Freestyle", 30)
+    createFloatingEmoteChoice("Bumper Kart", 15)
+    createFloatingEmoteChoice("Stride", 46)
+    createFloatingEmoteChoice("Breakdown", 93)
+    createFloatingEmoteChoice("Carlton", 19)
+    createFloatingEmoteChoice("leaping dolphin", 1715)
+    createFloatingEmoteChoice("Encapsulated Bubble", 1714)
+    createFloatingEmoteChoice("Astral Manta Ray", 1712)
+    createFloatingEmoteChoice("Summer Lowride", 1711)
+    createFloatingEmoteChoice("Swag mode", 47)
+    createFloatingEmoteChoice("Bold March", 14)
+    createFloatingEmoteChoice("Moonwalk", 70)
+    createFloatingEmoteChoice("Snowmobile", 62)
+    createFloatingEmoteChoice("Submarine", 1717)
+
+    AddToggle(MainTab, "AUTO JUMP + EMOTE", function(state)
+        autoJumpActive = state
+        JumpFloatingBtn.Visible = state
+        EmoteFloatingBtn.Visible = state
+        if not state then
+            EmotePanel.Visible = false
+            emotePanelOpen = false
+            jumpBtnActive = false
+            JumpFloatingBtn.Text = "JUMP: OFF"
+        end
+        showNotification(state and "Auto Jump & Emote Buttons Enabled!" or "Auto Jump Disabled")
+    end)
+
+    local lastJumpTick = 0
+    RunService.Heartbeat:Connect(function()
+        if autoJumpActive and jumpBtnActive and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid.FloorMaterial ~= Enum.Material.Air then
+                local currentTime = tick()
+                if currentTime - lastJumpTick > 0.8 then
+                    lastJumpTick = currentTime
+                    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                    pcall(function()
+                        ReplicatedStorage.Events.CharacterTask:FireServer("Emote", SelectedEmoteID)
+                    end)
+                end
+            end
+        end
+    end)
+
+    local frontJumpActive = false
+    local frontJumpBtnActive = false
+    
+    -- ==============================
+    -- FRONT JUMP (FT) W/ ADJUSTABLE SPEED & FLOATING BUTTON
+    -- ==============================
+    local frontJumpActive = false
+    local frontJumpBtnActive = false
+    local frontJumpSpeed = 60 -- Itinaas ko ang default speed para mas mabilis[span_4](start_span)[span_4](end_span)
+    local frontJumpPower = 18 -- Binabaan ko ang default jump power para hindi masyadong mataas ang talon[span_5](start_span)[span_5](end_span)
+
+    local FrontJumpFloatingBtn = Instance.new("TextButton")
+    FrontJumpFloatingBtn.Name = "FrontJumpFloatingBtn"
+    FrontJumpFloatingBtn.Parent = ScreenGui
+    FrontJumpFloatingBtn.BackgroundColor3 = color_soft_white
+    FrontJumpFloatingBtn.BackgroundTransparency = 0.1
+    FrontJumpFloatingBtn.Position = UDim2.new(0.5, 0, 0.38, 0)
+    FrontJumpFloatingBtn.Size = UDim2.new(0, 130, 0, 38)
+    FrontJumpFloatingBtn.Font = Enum.Font.GothamBold
+    FrontJumpFloatingBtn.Text = "FRONT JUMP: OFF"
+    FrontJumpFloatingBtn.TextColor3 = color_dark_text
+    FrontJumpFloatingBtn.TextSize = 11
+    FrontJumpFloatingBtn.Visible = false
+    FrontJumpFloatingBtn.Active = true
+    MakeDraggableCustom(FrontJumpFloatingBtn)
+    local fjCorner = Instance.new("UICorner") fjCorner.CornerRadius = UDim.new(0, 8) fjCorner.Parent = FrontJumpFloatingBtn
+    local fjStroke = Instance.new("UIStroke") fjStroke.Parent = FrontJumpFloatingBtn fjStroke.Color = Color3.fromRGB(200, 200, 210) fjStroke.Thickness = 1.5
+
+    FrontJumpFloatingBtn.MouseButton1Click:Connect(function()
+        frontJumpBtnActive = not frontJumpBtnActive
+        FrontJumpFloatingBtn.Text = frontJumpBtnActive and "FRONT JUMP: ON" or "FRONT JUMP: OFF"
+        showNotification(frontJumpBtnActive and "Front Jump Floating ON" or "Front Jump Floating OFF")
+    end)
+
+    AddToggle(MainTab, "FRONT JUMP (FT) (W/ FLOAT)", function(state)
+        frontJumpActive = state
+        FrontJumpFloatingBtn.Visible = state
+        FrontJumpFloatingBtn.Text = state and "FRONT JUMP: ON" or "FRONT JUMP: OFF"
+        showNotification(state and "Front Jump Enabled & Floating Button Shown" or "Front Jump Disabled")
+    end)
+
+    -- Slider para sa Bilisan / Speed[span_6](start_span)[span_6](end_span)
+    AddMaangasSlider(MainTab, "FRONT JUMP SPEED", 20, 180, 60, function(val)
+        frontJumpSpeed = val
+    end)
+
+    -- Slider para sa Taas ng Talon (Para ikaw na bahala mag-adjust kung mababa o mataas)[span_7](start_span)[span_7](end_span)
+    AddMaangasSlider(MainTab, "FRONT JUMP POWER", 10, 40, 18, function(val)
+        frontJumpPower = val
+    end)
+
+    local lastFrontJumpTick = 0
+    RunService.Heartbeat:Connect(function()
+        if frontJumpActive and frontJumpBtnActive and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            local rootPart = LocalPlayer.Character.HumanoidRootPart
+            
+            if humanoid and humanoid.Health > 0 then
+                -- Kinukuha ang direksyon kung saan nakaharap ang Character[span_8](start_span)[span_8](end_span)
+                local lookDir = rootPart.CFrame.LookVector
+                
+                -- Sapilitang pinapagalaw ang Humanoid papunta sa harap[span_9](start_span)[span_9](end_span)
+                humanoid:Move(Vector3.new(lookDir.X, 0, lookDir.Z), true)
+                
+                -- Mas pinalakas at binigyan ng direksyon ang bilis habang tumatakbo[span_10](start_span)[span_10](end_span)
+                rootPart.AssemblyLinearVelocity = Vector3.new(lookDir.X * frontJumpSpeed, rootPart.AssemblyLinearVelocity.Y, lookDir.Z * frontJumpSpeed)
+                
+                -- Auto Jump Logic na mababa na ang talon at mabilis ang pag-trigger[span_11](start_span)[span_11](end_span)
+                if humanoid.FloorMaterial ~= Enum.Material.Air then
+                    local currentTime = tick()
+                    if currentTime - lastFrontJumpTick > 0.3 then -- Mas pinabilis ko ng konti ang interval para tuloy-tuloy ang talon[span_12](start_span)[span_12](end_span)
+                        lastFrontJumpTick = currentTime
+                        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                        -- Dito na-control ang taas gamit ang 'frontJumpPower' variable[span_13](start_span)[span_13](end_span)
+                        rootPart.AssemblyLinearVelocity = Vector3.new(lookDir.X * frontJumpSpeed, frontJumpPower, lookDir.Z * frontJumpSpeed)
+                    end
+                end
+            end
+        end
+    end)
+
+    local bounceActive = false
+    local bounceBtnActive = false
+    local bouncePowerVal = 80
+    local wasInAir = false
+
+    local BounceFloatingBtn = Instance.new("TextButton")
+    BounceFloatingBtn.Name = "BounceFloatingBtn"
+    BounceFloatingBtn.Parent = ScreenGui
+    BounceFloatingBtn.BackgroundColor3 = color_soft_white
+    BounceFloatingBtn.BackgroundTransparency = 0.1
+    BounceFloatingBtn.Position = UDim2.new(0.5, 0, 0.2, 0)
+    BounceFloatingBtn.Size = UDim2.new(0, 130, 0, 38)
+    BounceFloatingBtn.Font = Enum.Font.GothamBold
+    BounceFloatingBtn.Text = "BOUNCE: OFF"
+    BounceFloatingBtn.TextColor3 = color_dark_text
+    BounceFloatingBtn.TextSize = 11
+    BounceFloatingBtn.Visible = false
+    BounceFloatingBtn.Active = true
+    MakeDraggableCustom(BounceFloatingBtn)
+    local bCorner = Instance.new("UICorner") bCorner.CornerRadius = UDim.new(0, 8) bCorner.Parent = BounceFloatingBtn
+    local bStroke = Instance.new("UIStroke") bStroke.Parent = BounceFloatingBtn bStroke.Color = Color3.fromRGB(200, 200, 210) bStroke.Thickness = 1.5
+
+    BounceFloatingBtn.MouseButton1Click:Connect(function()
+        bounceBtnActive = not bounceBtnActive
+        BounceFloatingBtn.Text = bounceBtnActive and "BOUNCE: ON" or "BOUNCE: OFF"
+        showNotification(bounceBtnActive and "Bounce Floating ON" or "Bounce Floating OFF")
+    end)
+
+    AddToggle(MainTab, "GROUND BOUNCE (W/ FLOAT)", function(state)
+        bounceActive = state
+        BounceFloatingBtn.Visible = state
+        BounceFloatingBtn.Text = state and "BOUNCE: ON" or "BOUNCE: OFF"
+        showNotification(state and "Ground Bounce Enabled & Floating Button Shown" or "Ground Bounce Disabled")
+    end)
+
+    AddMaangasSlider(MainTab, "BOUNCE POWER", 20, 200, 80, function(val)
+        bouncePowerVal = val
+    end)
+
+    RunService.Heartbeat:Connect(function()
+        if bounceActive and bounceBtnActive and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            local rootPart = LocalPlayer.Character.HumanoidRootPart
+            if humanoid and humanoid.FloorMaterial == Enum.Material.Air then
+                wasInAir = true
+            else
+                if wasInAir then
+                    wasInAir = false
+                    rootPart.AssemblyLinearVelocity = Vector3.new(rootPart.AssemblyLinearVelocity.X, bouncePowerVal, rootPart.AssemblyLinearVelocity.Z)
+                end
+            end
+        end
+    end)
+    
+        -- ==============================
+    -- FAKE LAG / LAG SWITCH (UPDATED)
+    -- ==============================
+    local fakeLagActive = false
+    local fakeLagBtnActive = false
+    local isLagging = false
+
+    local FakeLagFloatingBtn = Instance.new("TextButton")
+    FakeLagFloatingBtn.Name = "FakeLagFloatingBtn"
+    FakeLagFloatingBtn.Parent = ScreenGui
+    FakeLagFloatingBtn.BackgroundColor3 = color_soft_white
+    FakeLagFloatingBtn.BackgroundTransparency = 0.1
+    FakeLagFloatingBtn.Position = UDim2.new(0.5, 0, 0.48, 0)
+    FakeLagFloatingBtn.Size = UDim2.new(0, 130, 0, 38)
+    FakeLagFloatingBtn.Font = Enum.Font.GothamBold
+    FakeLagFloatingBtn.Text = "LAG SWITCH: OFF"
+    FakeLagFloatingBtn.TextColor3 = color_dark_text
+    FakeLagFloatingBtn.TextSize = 11
+    FakeLagFloatingBtn.Visible = false
+    FakeLagFloatingBtn.Active = true
+    MakeDraggableCustom(FakeLagFloatingBtn)
+    local flCorner = Instance.new("UICorner") flCorner.CornerRadius = UDim.new(0, 8) flCorner.Parent = FakeLagFloatingBtn
+    local flStroke = Instance.new("UIStroke") flStroke.Parent = FakeLagFloatingBtn flStroke.Color = Color3.fromRGB(200, 200, 210) flStroke.Thickness = 1.5
+
+    -- Floating Button Trigger
+    FakeLagFloatingBtn.MouseButton1Click:Connect(function()
+        fakeLagBtnActive = not fakeLagBtnActive
+        FakeLagFloatingBtn.Text = fakeLagBtnActive and "LAG SWITCH: ON" or "LAG SWITCH: OFF"
+        showNotification(fakeLagBtnActive and "Lag Switch ENABLED!" or "Lag Switch DISABLED!")
+    end)
+
+    -- Toggle sa loob ng Main Tab
+    AddToggle(MainTab, "LAG SWITCH (W/ FLOAT)", function(state)
+        fakeLagActive = state
+        FakeLagFloatingBtn.Visible = state
+        FakeLagFloatingBtn.Text = state and "LAG SWITCH: ON" or "LAG SWITCH: OFF"
+        if not state then
+            fakeLagBtnActive = false
+        else
+            fakeLagBtnActive = true
+        end
+        showNotification(state and "Lag Switch Ready (Floating Button Shown)" or "Lag Switch Off")
+    end)
+
+    -- Loop para sa pag-trigger ng freezing effect (Lag Interval)
+    task.spawn(function()
+        while true do
+            task.wait(0.05)
+            if fakeLagActive and fakeLagBtnActive then
+                isLagging = true
+                task.wait(0.4) -- Oras ng Freeze/Lag (400ms delay sa server/ibang players)
+                isLagging = false
+                task.wait(0.05) -- Mabilis na burst ng normal movement
+            else
+                isLagging = false
+            end
+        end
+    end)
+
+    -- Engine loop para pigilan ang Network/Velocity updates habang lagging
+    RunService.Heartbeat:Connect(function()
+        if fakeLagActive and fakeLagBtnActive and isLagging and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local rootPart = LocalPlayer.Character.HumanoidRootPart
+            -- Pinalalabas na 0 ang velocity habang gumagalaw para mag-teleport/stutter sa paningin ng iba
+            rootPart.AssemblyLinearVelocity = Vector3.new(0, rootPart.AssemblyLinearVelocity.Y, 0)
+        end
+    end)
+    
+    local autoBubbleActive = false
+    local farmBtnActive = false
+    local customSavedPosition = nil
+
+    local FarmFloatingBtn = Instance.new("TextButton")
+    FarmFloatingBtn.Name = "FarmFloatingBtn"
+    FarmFloatingBtn.Parent = ScreenGui
+    FarmFloatingBtn.BackgroundColor3 = color_soft_white
+    FarmFloatingBtn.BackgroundTransparency = 0.1
+    FarmFloatingBtn.Position = UDim2.new(0.5, 0, 0.3, 0)
+    FarmFloatingBtn.Size = UDim2.new(0, 130, 0, 38)
+    FarmFloatingBtn.Font = Enum.Font.GothamBold
+    FarmFloatingBtn.Text = "FARM: OFF"
+    FarmFloatingBtn.TextColor3 = color_dark_text
+    FarmFloatingBtn.TextSize = 11
+    FarmFloatingBtn.Visible = false
+    FarmFloatingBtn.Active = true
+    MakeDraggableCustom(FarmFloatingBtn)
+    local fCorner = Instance.new("UICorner") fCorner.CornerRadius = UDim.new(0, 8) fCorner.Parent = FarmFloatingBtn
+    local fStroke = Instance.new("UIStroke") fStroke.Parent = FarmFloatingBtn fStroke.Color = Color3.fromRGB(200, 200, 210) fStroke.Thickness = 1.5
+
+    FarmFloatingBtn.MouseButton1Click:Connect(function()
+        farmBtnActive = not farmBtnActive
+        FarmFloatingBtn.Text = farmBtnActive and "FARM: ON" or "FARM: OFF"
+        showNotification(farmBtnActive and "Auto Farm Floating ON" or "Auto Farm Floating OFF")
+    end)
+
+    AddToggle(MainTab, "AUTO BUBBLE FARM (W/ FLOAT)", function(state)
+        autoBubbleActive = state
+        FarmFloatingBtn.Visible = state
+        FarmFloatingBtn.Text = state and "FARM: ON" or "FARM: OFF"
+        showNotification(state and "Auto Bubble Farm Enabled & Floating Button Shown!" or "Auto Bubble Farm Disabled!")
+    end)
+
+    task.spawn(function()
+        local autoSafePosition = nil
+        while true do
+            task.wait(0.3)
+            if autoBubbleActive and farmBtnActive and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local rootPart = LocalPlayer.Character.HumanoidRootPart
+                if not autoSafePosition and not customSavedPosition then
+                    autoSafePosition = rootPart.CFrame
+                end
+                local activeSafePos = customSavedPosition or autoSafePosition
+
+                local targetBubble = nil
+                for _, obj in pairs(workspace:GetDescendants()) do
+                    if obj:IsA("BasePart") and (obj.Name:lower():find("bubble") or obj.Name:lower():find("event")) then
+                        targetBubble = obj
+                        break
+                    end
+                end
+                if targetBubble then
+                    rootPart.CFrame = targetBubble.CFrame + Vector3.new(0, 3, 0)
+                    task.wait(1.0)
+                    if activeSafePos then rootPart.CFrame = activeSafePos end
+                    task.wait(1.2)
+                end
+            end
+        end
+    end)
+
+    local EmoteHeader = Instance.new("TextLabel")
+    EmoteHeader.Size = UDim2.new(1, -10, 0, 20)
+    EmoteHeader.BackgroundTransparency = 1
+    EmoteHeader.TextColor3 = color_dark_text
+    EmoteHeader.TextSize = 11
+    EmoteHeader.Font = Enum.Font.GothamBold
+    EmoteHeader.Text = "SELECT EMOTE SOURCE:"
+    EmoteHeader.Parent = VisualTab
+
+    local function createVisualEmoteBtn(name, id)
+        local btn = Instance.new("TextButton")
+        btn.Parent = VisualTab
+        btn.BackgroundColor3 = color_soft_white
+        btn.BackgroundTransparency = 0.5
+        btn.BorderSizePixel = 0
+        btn.Size = UDim2.new(1, -10, 0, 30)
+        btn.Font = Enum.Font.GothamBold
+        btn.Text = "Emote: " .. name .. " (ID " .. id .. ")"
+        btn.TextColor3 = color_dark_text
+        btn.TextSize = 11
+        btn.AutoButtonColor = false
+        
+        local corner = Instance.new("UICorner") corner.CornerRadius = UDim.new(0, 6) corner.Parent = btn
+        local stroke = Instance.new("UIStroke") stroke.Parent = btn stroke.Color = Color3.fromRGB(220, 220, 225) stroke.Thickness = 1
+
+        btn.MouseButton1Click:Connect(function()
+            SelectedEmoteID = id
+            showNotification("Emote Source Set to: " .. name)
+        end)
+        return btn
+    end
+
+    createVisualEmoteBtn("Goofy", 32)
+    createVisualEmoteBtn("Freestyle", 30)
+    createVisualEmoteBtn("Bumper Kart", 15)
+    createVisualEmoteBtn("Stride", 46)
+    createVisualEmoteBtn("Breakdown", 93)
+    createVisualEmoteBtn("Carlton", 19)
+    createVisualEmoteBtn("leaping dolphin", 1715)
+    createVisualEmoteBtn("Encapsulated Bubble", 1714)
+    createVisualEmoteBtn("Astral Manta Ray", 1711)
+    createVisualEmoteBtn("Summer Lowride", 1711) 
+    createVisualEmoteBtn("Swag mode", 47)
+    createVisualEmoteBtn("Bold March", 14)
+    createVisualEmoteBtn("Moonwalk", 70)
+    createVisualEmoteBtn("Snowmobile", 62)
+    createVisualEmoteBtn("Submarine Ride", 1717)
+
+    -- ==============================
+    -- GRAPHICS TAB WITH LIVE COUNTY & DASHBOARD
+    -- ==============================
+    local DashboardCard = Instance.new("Frame")
+    DashboardCard.Name = "DashboardCard"
+    DashboardCard.Parent = GraphicsTab
+    DashboardCard.BackgroundColor3 = color_soft_white
+    DashboardCard.BackgroundTransparency = 0.3
+    DashboardCard.BorderSizePixel = 0
+    DashboardCard.Size = UDim2.new(1, -10, 0, 100)
+
+    local dcCorner = Instance.new("UICorner") dcCorner.CornerRadius = UDim.new(0, 8) dcCorner.Parent = DashboardCard
+    local dcStroke = Instance.new("UIStroke") dcStroke.Parent = DashboardCard dcStroke.Color = Color3.fromRGB(210, 210, 220) dcStroke.Thickness = 1
+
+    local DashTitle = Instance.new("TextLabel")
+    DashTitle.Parent = DashboardCard
+    DashTitle.BackgroundTransparency = 1
+    DashTitle.Position = UDim2.new(0, 10, 0, 6)
+    DashTitle.Size = UDim2.new(1, -20, 0, 18)
+    DashTitle.Font = Enum.Font.GothamBold
+    DashTitle.Text = "LIVE DASHBOARD (FPS / COUNTY / PLAYERS)"
+    DashTitle.TextColor3 = color_dark_text
+    DashTitle.TextSize = 11
+    DashTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+    local FpsDisplay = Instance.new("TextLabel")
+    FpsDisplay.Parent = DashboardCard
+    FpsDisplay.BackgroundTransparency = 1
+    FpsDisplay.Position = UDim2.new(0, 10, 0, 26)
+    FpsDisplay.Size = UDim2.new(1, -20, 0, 16)
+    FpsDisplay.Font = Enum.Font.GothamMedium
+    FpsDisplay.Text = "FPS: Calculating..."
+    FpsDisplay.TextColor3 = color_gray
+    FpsDisplay.TextSize = 10
+    FpsDisplay.TextXAlignment = Enum.TextXAlignment.Left
+
+    local CountyDisplay = Instance.new("TextLabel")
+    CountyDisplay.Parent = DashboardCard
+    CountyDisplay.BackgroundTransparency = 1
+    CountyDisplay.Position = UDim2.new(0, 10, 0, 42)
+    CountyDisplay.Size = UDim2.new(1, -20, 0, 16)
+    CountyDisplay.Font = Enum.Font.GothamMedium
+    CountyDisplay.Text = "Server County: Checking Region..."
+    CountyDisplay.TextColor3 = color_gray
+    CountyDisplay.TextSize = 10
+    CountyDisplay.TextXAlignment = Enum.TextXAlignment.Left
+
+    local PlayersDisplay = Instance.new("TextLabel")
+    PlayersDisplay.Parent = DashboardCard
+    PlayersDisplay.BackgroundTransparency = 1
+    PlayersDisplay.Position = UDim2.new(0, 10, 0, 58)
+    PlayersDisplay.Size = UDim2.new(1, -20, 0, 16)
+    PlayersDisplay.Font = Enum.Font.GothamMedium
+    PlayersDisplay.Text = "Players in Server: 0/0"
+    PlayersDisplay.TextColor3 = color_gray
+    PlayersDisplay.TextSize = 10
+    PlayersDisplay.TextXAlignment = Enum.TextXAlignment.Left
+
+    local TimeDisplay = Instance.new("TextLabel")
+    TimeDisplay.Parent = DashboardCard
+    TimeDisplay.BackgroundTransparency = 1
+    TimeDisplay.Position = UDim2.new(0, 10, 0, 74)
+    TimeDisplay.Size = UDim2.new(1, -20, 0, 16)
+    TimeDisplay.Font = Enum.Font.GothamMedium
+    TimeDisplay.Text = "Time in Server: 00:00:00"
+    TimeDisplay.TextColor3 = color_gray
+    TimeDisplay.TextSize = 10
+    TimeDisplay.TextXAlignment = Enum.TextXAlignment.Left
+
+    task.spawn(pcall, function()
+        local countryCode = LocalizationService:GetCountryRegionForPlayerAsync(LocalPlayer)
+        CountyDisplay.Text = "Server County: " .. (countryCode ~= "" and countryCode or "Global / PH")
+    end)
+
+    local joinTick = tick()
+    local frameCount = 0
+    local lastFpsUpdate = tick()
+    local currentFps = 60
+
+    RunService.RenderStepped:Connect(function()
+        frameCount = frameCount + 1
+        local now = tick()
+        if now - lastFpsUpdate >= 1 then
+            currentFps = math.floor(frameCount / (now - lastFpsUpdate))
+            frameCount = 0
+            lastFpsUpdate = now
+        end
+
+        local totalPlayers = #Players:GetPlayers()
+        local maxPlayers = Players.MaxPlayers or 0
+        
+        local elapsedSec = math.floor(now - joinTick)
+        local hours = math.floor(elapsedSec / 3600)
+        local minutes = math.floor((elapsedSec % 3600) / 60)
+        local seconds = elapsedSec % 60
+        local timeStr = string.format("%02d:%02d:%02d", hours, minutes, seconds)
+
+        FpsDisplay.Text = "FPS: " .. currentFps
+        PlayersDisplay.Text = "Players in Server: " .. totalPlayers .. "/" .. maxPlayers
+        TimeDisplay.Text = "Time in Server: " .. timeStr
+    end)
+
+    AddToggle(GraphicsTab, "FULLBRIGHT", function(state)
+        Lighting.Brightness = state and 2 or 1
+        Lighting.GlobalShadows = not state
+        showNotification(state and "Fullbright Enabled" or "Fullbright Disabled")
+    end)
+
+    AddToggle(GraphicsTab, "FPS UNLOCKER", function(state)
+        pcall(function()
+            if setfpscap then
+                setfpscap(state and 999 or 60)
+            end
+        end)
+        showNotification(state and "FPS Unlocked (Max FPS)" or "FPS Cap Restored to 60")
+    end)
+
+    AddToggle(GraphicsTab, "HD GRAPHICS (HIGH-QUALITY)", function(state)
+        if state then
+            Lighting.Technology = Enum.Technology.Future
+            Lighting.GlobalShadows = true
+            Lighting.Brightness = 2.2
+            
+            local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
+            atmosphere.Density = 0.25
+            atmosphere.Offset = 0.1
+            atmosphere.Color = Color3.fromRGB(240, 245, 255)
+            atmosphere.Decay = Color3.fromRGB(100, 110, 130)
+            atmosphere.Parent = Lighting
+
+            local bloom = Instance.new("BloomEffect")
+            bloom.Intensity = 0.3
+            bloom.Size = 20
+            bloom.Threshold = 0.75
+            bloom.Parent = Lighting
+
+            local colorCorrection = Instance.new("ColorCorrectionEffect")
+            colorCorrection.Brightness = 0.05
+            colorCorrection.Contrast = 0.2
+            colorCorrection.Saturation = 0.35
+            colorCorrection.Parent = Lighting
+
+            showNotification("HD Graphics Enabled (High Quality)!")
+        else
+            Lighting.Technology = Enum.Technology.Compatibility
+            for _, eff in ipairs(Lighting:GetChildren()) do
+                if eff:IsA("BloomEffect") or eff:IsA("ColorCorrectionEffect") then
+                    eff:Destroy()
+                end
+            end
+            showNotification("HD Graphics Disabled!")
+        end
+    end)
+
+    local shaderEffects = {}
+    AddToggle(GraphicsTab, "SMOOTH SHADERS (RT)", function(state)
+        if state then
+            Lighting.Technology = Enum.Technology.Future
+            local bloom = Instance.new("BloomEffect")
+            bloom.Intensity = 0.45
+            bloom.Size = 24
+            bloom.Threshold = 0.8
+            bloom.Parent = Lighting
+            table.insert(shaderEffects, bloom)
+
+            local sunRays = Instance.new("SunRaysEffect")
+            sunRays.Intensity = 0.2
+            sunRays.Spread = 1
+            sunRays.Parent = Lighting
+            table.insert(shaderEffects, sunRays)
+
+            local colorCorrection = Instance.new("ColorCorrectionEffect")
+            colorCorrection.Brightness = 0.05
+            colorCorrection.Contrast = 0.15
+            colorCorrection.Saturation = 0.2
+            colorCorrection.Parent = Lighting
+            table.insert(shaderEffects, colorCorrection)
+
+            local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
+            atmosphere.Density = 0.3
+            atmosphere.Offset = 0.25
+            atmosphere.Haze = 1
+            atmosphere.Color = Color3.fromRGB(199, 170, 107)
+            atmosphere.Decay = Color3.fromRGB(92, 60, 13)
+            atmosphere.Parent = Lighting
+            table.insert(shaderEffects, atmosphere)
+
+            showNotification("Shaders Enabled")
+        else
+            Lighting.Technology = Enum.Technology.Compatibility
+            for _, effect in ipairs(shaderEffects) do
+                if effect then effect:Destroy() end
+            end
+            shaderEffects = {}
+            showNotification("Shaders Disabled")
+        end
+    end)
+
+    AddToggle(GraphicsTab, "POTATO GRAPHICS", function(state)
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.Material = state and Enum.Material.SmoothPlastic or Enum.Material.Plastic
+                if v:IsA("MeshPart") then
+                    v.TextureID = state and "" or v.TextureID
+                end
+            elseif v:IsA("Decal") or v:IsA("Texture") then
+                v.Transparency = state and 1 or 0
+            end
+        end
+        if Terrain then
+            Terrain.WaterWaveSize = state and 0 or 1
+            Terrain.WaterTransparency = state and 0 or 0.3
+        end
+        showNotification(state and "Potato Graphics Enabled (Max FPS)!" or "Potato Graphics Disabled!")
+    end)
+
+    AddToggle(GraphicsTab, "SMOOTH WALLS (PLAIN)", function(state)
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and not obj:IsDescendantOf(LocalPlayer.Character) then
+                if state then
+                    obj.Material = Enum.Material.SmoothPlastic
+                    obj.Reflectance = 0
+                    for _, child in pairs(obj:GetChildren()) do
+                        if child:IsA("Texture") or child:IsA("Decal") then
+                            child.Transparency = 1
+                        end
+                    end
+                else
+                    obj.Material = Enum.Material.Plastic
+                end
+            end
+        end
+        showNotification(state and "Walls Set to Plain & Smooth!" or "Walls Restored!")
+    end)
+
+    AddToggle(GraphicsTab, "REMOVE CAM SHAKE", function(state)
+        showNotification(state and "Camera Shake Disabled" or "Camera Shake Restored")
+    end)
+
+    AddToggle(GraphicsTab, "REMOVE MAP FOG", function(state)
+        if state then
+            Lighting.FogEnd = 9e9
+            showNotification("Map Fog Removed")
+        else
+            Lighting.FogEnd = 1000
+            showNotification("Map Fog Restored")
+        end
+    end)
+
+    local SoundObj = Instance.new("Sound")
+    SoundObj.Name = "MaangasBoomboxSound"
+    SoundObj.Parent = SoundService or workspace
+    SoundObj.Volume = 2
+    SoundObj.Looped = true
+
+    local SongIdBox = AddTextBox(BoomboxTab, "Enter Audio ID here...", "", function() end)
+
+    local function AddButton(tab, text, callback)
+        local btn = Instance.new("TextButton")
+        btn.Parent = tab
+        btn.BackgroundColor3 = color_soft_white
+        btn.BackgroundTransparency = 0.5
+        btn.BorderSizePixel = 0
+        btn.Size = UDim2.new(1, -10, 0, 32)
+        btn.Font = Enum.Font.GothamBold
+        btn.Text = text
+        btn.TextColor3 = color_dark_text
+        btn.TextSize = 11
+        btn.AutoButtonColor = false
+        local corner = Instance.new("UICorner") corner.CornerRadius = UDim.new(0, 6) corner.Parent = btn
+        local stroke = Instance.new("UIStroke") stroke.Parent = btn stroke.Color = Color3.fromRGB(220, 220, 225) stroke.Thickness = 1
+        btn.MouseButton1Click:Connect(callback)
+        return btn
+    end
+
+    local MusicFloatingBar = Instance.new("Frame")
+    MusicFloatingBar.Name = "MusicFloatingBar"
+    MusicFloatingBar.Parent = ScreenGui
+    MusicFloatingBar.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    MusicFloatingBar.BackgroundTransparency = 0.2
+    MusicFloatingBar.BorderSizePixel = 0
+    MusicFloatingBar.Position = UDim2.new(0.5, -110, 0.05, 0)
+    MusicFloatingBar.Size = UDim2.new(0, 220, 0, 34)
+    MusicFloatingBar.Visible = false
+    MusicFloatingBar.Active = true
+    MakeDraggableCustom(MusicFloatingBar)
+
+    local mfbCorner = Instance.new("UICorner") mfbCorner.CornerRadius = UDim.new(1, 0) mfbCorner.Parent = MusicFloatingBar
+    local mfbStroke = Instance.new("UIStroke") mfbStroke.Parent = MusicFloatingBar mfbStroke.Color = current_accent mfbStroke.Thickness = 1.5
+    table.insert(accentDependentStrokes, mfbStroke)
+
+    local WaveHolder = Instance.new("Frame")
+    WaveHolder.Parent = MusicFloatingBar
+    WaveHolder.BackgroundTransparency = 1
+    WaveHolder.Position = UDim2.new(0, 12, 0.5, -7)
+    WaveHolder.Size = UDim2.new(0, 24, 0, 14)
+
+    local waveBars = {}
+    local function createWaveBar(xOffset)
+        local wBar = Instance.new("Frame")
+        wBar.Parent = WaveHolder
+        wBar.BackgroundColor3 = current_accent
+        wBar.BorderSizePixel = 0
+        wBar.Position = UDim2.new(0, xOffset, 0, 0)
+        wBar.Size = UDim2.new(0, 4, 1, 0)
+        local wc = Instance.new("UICorner") wc.CornerRadius = UDim.new(1, 0) wc.Parent = wBar
+        table.insert(accentDependentBlades, wBar)
+        table.insert(waveBars, wBar)
+        return wBar
+    end
+    createWaveBar(0) createWaveBar(6) createWaveBar(12) createWaveBar(18)
+
+    local MusicStatusText = Instance.new("TextLabel")
+    MusicStatusText.Parent = MusicFloatingBar
+    MusicStatusText.BackgroundTransparency = 1
+    MusicStatusText.Position = UDim2.new(0, 42, 0, 0)
+    MusicStatusText.Size = UDim2.new(1, -48, 1, 0)
+    MusicStatusText.Font = Enum.Font.GothamBold
+    MusicStatusText.Text = "music | 00:00 / 00:00"
+    MusicStatusText.TextColor3 = Color3.fromRGB(240, 240, 245)
+    MusicStatusText.TextSize = 10
+    MusicStatusText.TextXAlignment = Enum.TextXAlignment.Left
+
+    RunService.RenderStepped:Connect(function()
+        if SoundObj.IsPlaying then
+            local t = tick() * 10
+            for i, bar in ipairs(waveBars) do
+                local randomHeight = math.abs(math.sin(t + (i * 1.5))) * 12 + 4
+                bar.Size = UDim2.new(0, 4, 0, randomHeight)
+                bar.Position = UDim2.new(0, (i - 1) * 6, 0, 14 - randomHeight)
+            end
+            
+            local currentPos = math.floor(SoundObj.TimePosition)
+            local totalLen = math.floor(SoundObj.TimeLength > 0 and SoundObj.TimeLength or 0)
+            local curMin = math.floor(currentPos / 60)
+            local curSec = currentPos % 60
+            local totMin = math.floor(totalLen / 60)
+            local totSec = totalLen % 60
+            MusicStatusText.Text = string.format("playing | %02d:%02d / %02d:%02d", curMin, curSec, totMin, totSec)
+        else
+            for _, bar in ipairs(waveBars) do
+                bar.Size = UDim2.new(0, 4, 0, 4)
+                bar.Position = UDim2.new(0, bar.Position.X.Offset, 0, 5)
+            end
+        end
+    end)
+
+    AddButton(BoomboxTab, "PLAY MUSIC", function()
+        local cleanID = string.match(SongIdBox.Text, "%d+")
+        if cleanID then
+            SoundObj.SoundId = "rbxassetid://" .. cleanID
+            SoundObj:Play()
+            MusicFloatingBar.Visible = true
+            showNotification("Playing ID: " .. cleanID)
+        else
+            showNotification("Invalid Sound ID!")
+        end
+    end)
+
+    AddButton(BoomboxTab, "STOP MUSIC", function()
+        SoundObj:Stop()
+        MusicFloatingBar.Visible = false
+        showNotification("Music Stopped")
+    end)
+
+    local SavedDropdownBtn = Instance.new("TextButton")
+    SavedDropdownBtn.Parent = BoomboxTab
+    SavedDropdownBtn.BackgroundColor3 = color_soft_white
+    SavedDropdownBtn.BackgroundTransparency = 0.4
+    SavedDropdownBtn.BorderSizePixel = 0
+    SavedDropdownBtn.Size = UDim2.new(1, -10, 0, 32)
+    SavedDropdownBtn.Font = Enum.Font.GothamBold
+    SavedDropdownBtn.Text = "↓ SAVED LIST (CLICK TO TOGGLE) ↓"
+    SavedDropdownBtn.TextColor3 = color_dark_text
+    SavedDropdownBtn.TextSize = 11
+    SavedDropdownBtn.AutoButtonColor = false
+
+    local sdCorner = Instance.new("UICorner") sdCorner.CornerRadius = UDim.new(0, 6) sdCorner.Parent = SavedDropdownBtn
+    local sdStroke = Instance.new("UIStroke") sdStroke.Parent = SavedDropdownBtn sdStroke.Color = Color3.fromRGB(220, 220, 225) sdStroke.Thickness = 1
+
+    local SavedListContainer = Instance.new("Frame")
+    SavedListContainer.Parent = BoomboxTab
+    SavedListContainer.BackgroundTransparency = 1
+    SavedListContainer.Size = UDim2.new(1, -10, 0, 0)
+    SavedListContainer.Visible = false
+    SavedListContainer.ClipsDescendants = true
+
+    local SavedListLayout = Instance.new("UIListLayout")
+    SavedListLayout.Parent = SavedListContainer
+    SavedListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    SavedListLayout.Padding = UDim.new(0, 4)
+
+    SavedListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        if SavedListContainer.Visible then
+            SavedListContainer.Size = UDim2.new(1, -10, 0, SavedListLayout.AbsoluteContentSize.Y)
+        end
+    end)
+
+    local isSavedListOpen = false
+    SavedDropdownBtn.MouseButton1Click:Connect(function()
+        isSavedListOpen = not isSavedListOpen
+        SavedDropdownBtn.Text = isSavedListOpen and "↑ SAVED LIST (CLICK TO CLOSE) ↑" or "↓ SAVED LIST (CLICK TO TOGGLE) ↓"
+        
+        local targetSize = isSavedListOpen and UDim2.new(1, -10, 0, SavedListLayout.AbsoluteContentSize.Y) or UDim2.new(1, -10, 0, 0)
+        
+        if isSavedListOpen then
+            SavedListContainer.Visible = true
+            Tween(SavedListContainer, "Size", targetSize, 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        else
+            Tween(SavedListContainer, "Size", targetSize, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+            task.wait(0.2)
+            if not isSavedListOpen then
+                SavedListContainer.Visible = false
+            end
+        end
+    end)
+
+    local NewNameBox = AddTextBox(BoomboxTab, "Enter Song Name...", "", function() end)
+    local NewIdBox = AddTextBox(BoomboxTab, "Enter Song ID to Save...", "", function() end)
+    local savedAudioDatabase = {}
+
+    local function addPresetMusicID(name, idStr, skipDatabaseInsert)
+        local itemFrame = Instance.new("Frame")
+        itemFrame.Parent = SavedListContainer
+        itemFrame.BackgroundColor3 = color_soft_white
+        itemFrame.BackgroundTransparency = 0.3
+        itemFrame.Size = UDim2.new(1, 0, 0, 30)
+        itemFrame.BorderSizePixel = 0
+        
+        local itCorner = Instance.new("UICorner") itCorner.CornerRadius = UDim.new(0, 6) itCorner.Parent = itemFrame
+        local itStroke = Instance.new("UIStroke") itStroke.Parent = itemFrame itStroke.Color = Color3.fromRGB(220, 220, 225) itStroke.Thickness = 1
+
+        local copyBtn = Instance.new("TextButton")
+        copyBtn.Parent = itemFrame
+        copyBtn.BackgroundTransparency = 1
+        copyBtn.Position = UDim2.new(0, 5, 0, 0)
+        copyBtn.Size = UDim2.new(0.75, 0, 1, 0)
+        copyBtn.Font = Enum.Font.GothamSemibold
+        copyBtn.Text = name .. " (" .. idStr .. ")"
+        copyBtn.TextColor3 = color_dark_text
+        copyBtn.TextSize = 10
+        copyBtn.TextXAlignment = Enum.TextXAlignment.Left
+
+        copyBtn.MouseButton1Click:Connect(function()
+            pcall(function() setclipboard(idStr) end)
+            SongIdBox.Text = idStr
+            showNotification("Copied & Applied: " .. name)
+        end)
+
+        local delBtn = Instance.new("TextButton")
+        delBtn.Parent = itemFrame
+        delBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+        delBtn.BackgroundTransparency = 0.2
+        delBtn.Position = UDim2.new(1, -55, 0, 4)
+        delBtn.Size = UDim2.new(0, 50, 0, 22)
+        delBtn.Font = Enum.Font.GothamBold
+        delBtn.Text = "DELETE"
+        delBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        delBtn.TextSize = 9
+        
+        local dCorner = Instance.new("UICorner") dCorner.CornerRadius = UDim.new(0, 4) dCorner.Parent = delBtn
+
+        delBtn.MouseButton1Click:Connect(function()
+            for i, v in ipairs(savedAudioDatabase) do
+                if v.Id == idStr and v.Name == name then
+                    table.remove(savedAudioDatabase, i)
+                    break
+                end
+            end
+            itemFrame:Destroy()
+            if isSavedListOpen then
+                SavedListContainer.Size = UDim2.new(1, -10, 0, SavedListLayout.AbsoluteContentSize.Y)
+            end
+            showNotification("Deleted ID from list!")
+        end)
+
+        if not skipDatabaseInsert then
+            table.insert(savedAudioDatabase, {Name = name, Id = idStr})
+        end
+
+        if isSavedListOpen then
+            SavedListContainer.Size = UDim2.new(1, -10, 0, SavedListLayout.AbsoluteContentSize.Y)
+        end
+    end
+
+    AddButton(BoomboxTab, "SAVE CURRENT ID TO LIST", function()
+        local name = NewNameBox.Text ~= "" and NewNameBox.Text or "Custom Song"
+        local idStr = string.match(NewIdBox.Text ~= "" and NewIdBox.Text or SongIdBox.Text, "%d+")
+        
+        if idStr then
+            addPresetMusicID(name, idStr, false)
+            showNotification("Successfully Saved ID!")
+        else
+            showNotification("Please provide a valid ID!")
+        end
+    end)
+
+    addPresetMusicID("Phonk Anthem", "1848356392", false)
+    addPresetMusicID("Maangas Beat", "1423760883", false)
+    addPresetMusicID("Night Drive Vibe", "9046834121", false)
+    addPresetMusicID("Hype Rap Banger", "6023457190", false)
+
+    -- ==============================
+    -- SETTINGS TAB (WITH CUSTOM KEYBIND MANAGER FOR PC & MOBILE STABILITY)
+    -- ==============================
+    local SettingsHeader = Instance.new("TextLabel")
+    SettingsHeader.Size = UDim2.new(1, -10, 0, 20)
+    SettingsHeader.BackgroundTransparency = 1
+    SettingsHeader.TextColor3 = color_dark_text
+    SettingsHeader.TextSize = 11
+    SettingsHeader.Font = Enum.Font.GothamBold
+    SettingsHeader.Text = "FLOATING BUTTONS CONTROL:"
+    SettingsHeader.Parent = SettingsTab
+
+    AddToggle(SettingsTab, "LOCK ALL FLOATING BUTTONS", function(state)
+        isFloatingLocked = state
+        showNotification(state and "All Floating Buttons Locked!" or "Floating Buttons Unlocked!")
+    end)
+    
+    -- ==============================
+-- WALLPAPER CHANGER SETTINGS IMPLEMENTATION
+-- ==============================
+
+-- 1. Background Image container para sa MainFrame (kung saan magbabago ang wallpaper)
+local WallpaperImage = Instance.new("ImageLabel")
+WallpaperImage.Name = "CustomWallpaperBackground"
+WallpaperImage.Parent = MainFrame -- Lalagay sa likod ng MainFrame
+WallpaperImage.BackgroundTransparency = 1
+WallpaperImage.Size = UDim2.new(1, 0, 1, 0)
+WallpaperImage.ZIndex = 0 -- Nasa ilalim ng mga elements pero sa ibabaw ng background
+WallpaperImage.Image = ""
+
+-- Siguraduhing may UICorner din ang wallpaper para sumunod sa pabilog na gilid ng MainFrame
+local wpCorner = Instance.new("UICorner")
+wpCorner.CornerRadius = UDim.new(0, 12)
+wpCorner.Parent = WallpaperImage
+
+-- 2. Dropdown Button para sa Wallpaper
+local WallpaperDropdownBtn = Instance.new("TextButton")
+WallpaperDropdownBtn.Parent = SettingsTab
+WallpaperDropdownBtn.BackgroundColor3 = color_soft_white
+WallpaperDropdownBtn.BackgroundTransparency = 0.4
+WallpaperDropdownBtn.BorderSizePixel = 0
+WallpaperDropdownBtn.Size = UDim2.new(1, -10, 0, 32)
+WallpaperDropdownBtn.Font = Enum.Font.GothamBold
+WallpaperDropdownBtn.Text = "↓ WALLPAPER LIST (CLICK TO TOGGLE) ↓"
+WallpaperDropdownBtn.TextColor3 = color_dark_text
+WallpaperDropdownBtn.TextSize = 11
+WallpaperDropdownBtn.AutoButtonColor = false
+
+local wpdCorner = Instance.new("UICorner") 
+wpdCorner.CornerRadius = UDim.new(0, 6) 
+wpdCorner.Parent = WallpaperDropdownBtn
+
+local wpdStroke = Instance.new("UIStroke") 
+wpdStroke.Parent = WallpaperDropdownBtn 
+wpdStroke.Color = Color3.fromRGB(220, 220, 225) 
+wpdStroke.Thickness = 1
+
+-- 3. Container para sa mga Wallpaper IDs (Downstairs list)
+local WallpaperListContainer = Instance.new("Frame")
+WallpaperListContainer.Parent = SettingsTab
+WallpaperListContainer.BackgroundTransparency = 1
+WallpaperListContainer.Size = UDim2.new(1, -10, 0, 0)
+WallpaperListContainer.Visible = false
+WallpaperListContainer.ClipsDescendants = true
+
+local WallpaperListLayout = Instance.new("UIListLayout")
+WallpaperListLayout.Parent = WallpaperListContainer
+WallpaperListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+WallpaperListLayout.Padding = UDim.new(0, 4)
+
+WallpaperListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    if WallpaperListContainer.Visible then
+        WallpaperListContainer.Size = UDim2.new(1, -10, 0, WallpaperListLayout.AbsoluteContentSize.Y)
+    end
+end)
+
+-- 4. Listahan ng iyong mga Wallpaper IDs
+local wallpaperIds = {
+    "86804080066329",
+    "126637324128751",
+    "90753510131110",
+    "138585601472822",
+    "124488269569524",
+    "100117583629495",
+    "101155616403464",
+    "80508252571924"
+}
+
+-- Function para gumawa ng button sa bawat wallpaper ID
+for index, id in ipairs(wallpaperIds) do
+    local wpChoiceBtn = Instance.new("TextButton")
+    wpChoiceBtn.Parent = WallpaperListContainer
+    wpChoiceBtn.BackgroundColor3 = color_soft_white
+    wpChoiceBtn.BackgroundTransparency = 0.3
+    wpChoiceBtn.BorderSizePixel = 0
+    wpChoiceBtn.Size = UDim2.new(1, 0, 0, 28)
+    wpChoiceBtn.Font = Enum.Font.GothamBold
+    wpChoiceBtn.Text = "Wallpaper " .. index .. " (" .. id .. ")"
+    wpChoiceBtn.TextColor3 = color_dark_text
+    wpChoiceBtn.TextSize = 10
+    
+    local wpcCorner = Instance.new("UICorner") 
+    wpcCorner.CornerRadius = UDim.new(0, 6) 
+    wpcCorner.Parent = wpChoiceBtn
+    
+    local wpcStroke = Instance.new("UIStroke") 
+    wpcStroke.Parent = wpChoiceBtn 
+    wpcStroke.Color = Color3.fromRGB(200, 200, 210) 
+    wpcStroke.Thickness = 1
+
+    wpChoiceBtn.MouseButton1Click:Connect(function()
+        WallpaperImage.Image = "rbxassetid://" .. id
+        showNotification("Wallpaper Changed Successfully!")
+    end)
+end
+
+-- 5. Extra button para i-reset o alisin ang wallpaper
+local ResetWpBtn = Instance.new("TextButton")
+ResetWpBtn.Parent = WallpaperListContainer
+ResetWpBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+ResetWpBtn.BackgroundTransparency = 0.3
+ResetWpBtn.BorderSizePixel = 0
+ResetWpBtn.Size = UDim2.new(1, 0, 0, 28)
+ResetWpBtn.Font = Enum.Font.GothamBold
+ResetWpBtn.Text = "REMOVE / RESET WALLPAPER"
+ResetWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ResetWpBtn.TextSize = 10
+
+local rwpCorner = Instance.new("UICorner") 
+rwpCorner.CornerRadius = UDim.new(0, 6) 
+rwpCorner.Parent = ResetWpBtn
+
+ResetWpBtn.MouseButton1Click:Connect(function()
+    WallpaperImage.Image = ""
+    showNotification("Wallpaper Removed!")
+end)
+
+-- 6. Toggle logic para bumaba at umakyat ang listahan kapag clinick
+local isWallpaperListOpen = false
+WallpaperDropdownBtn.MouseButton1Click:Connect(function()
+    isWallpaperListOpen = not isWallpaperListOpen
+    WallpaperDropdownBtn.Text = isWallpaperListOpen and "↑ WALLPAPER LIST (CLICK TO CLOSE) ↑" or "↓ WALLPAPER LIST (CLICK TO TOGGLE) ↓"
+    WallpaperListContainer.Visible = isWallpaperListOpen
+    if isWallpaperListOpen then
+        WallpaperListContainer.Size = UDim2.new(1, -10, 0, WallpaperListLayout.AbsoluteContentSize.Y)
+    end
+end)
+
+    local KeybindHeader = Instance.new("TextLabel")
+    KeybindHeader.Size = UDim2.new(1, -10, 0, 20)
+    KeybindHeader.BackgroundTransparency = 1
+    KeybindHeader.TextColor3 = color_dark_text
+    KeybindHeader.TextSize = 11
+    KeybindHeader.Font = Enum.Font.GothamBold
+    KeybindHeader.Text = "CUSTOM KEYBIND MANAGER (PC/MOBILE STABLE):"
+    KeybindHeader.Parent = SettingsTab
+
+    local currentToggleKey = Enum.KeyCode.RightControl
+    local KeybindDisplayBtn = Instance.new("TextButton")
+    KeybindDisplayBtn.Parent = SettingsTab
+    KeybindDisplayBtn.BackgroundColor3 = color_soft_white
+    KeybindDisplayBtn.BackgroundTransparency = 0.4
+    KeybindDisplayBtn.BorderSizePixel = 0
+    KeybindDisplayBtn.Size = UDim2.new(1, -10, 0, 32)
+    KeybindDisplayBtn.Font = Enum.Font.GothamBold
+    KeybindDisplayBtn.Text = "UI Toggle Key: RightControl (Click to Change)"
+    KeybindDisplayBtn.TextColor3 = color_dark_text
+    KeybindDisplayBtn.TextSize = 11
+    KeybindDisplayBtn.AutoButtonColor = false
+
+    local kbCorner = Instance.new("UICorner") kbCorner.CornerRadius = UDim.new(0, 6) kbCorner.Parent = KeybindDisplayBtn
+    local kbStroke = Instance.new("UIStroke") kbStroke.Parent = KeybindDisplayBtn kbStroke.Color = Color3.fromRGB(220, 220, 225) kbStroke.Thickness = 1
+
+    local listeningForKey = false
+    KeybindDisplayBtn.MouseButton1Click:Connect(function()
+        listeningForKey = true
+        KeybindDisplayBtn.Text = "Press any key now..."
+        showNotification("Listening for new keybind...")
+    end)
+
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if listeningForKey then
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                currentToggleKey = input.KeyCode
+                listeningForKey = false
+                KeybindDisplayBtn.Text = "UI Toggle Key: " .. input.KeyCode.Name .. " (Click to Change)"
+                showNotification("Keybind successfully changed to " .. input.KeyCode.Name)
+            end
+        else
+            if not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == currentToggleKey then
+                isVisible = not isVisible
+                if isVisible then
+                    MainFrame.Visible = true
+                    MainFrame.Size = UDim2.new(0, 0, 0, 0)
+                    Tween(MainFrame, "Size", UDim2.new(0, 500, 0, 340), 0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+                else
+                    Tween(MainFrame, "Size", UDim2.new(0, 0, 0, 0), 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+                    task.wait(0.2)
+                    if not isVisible then MainFrame.Visible = false end
+                end
+            end
+        end
+    end)
+
+        -- ==============================
+    -- SERVER MANAGEMENT & ANTI-AFK
+    -- ==============================
+    local ServerHopHeader = Instance.new("TextLabel")
+    ServerHopHeader.Size = UDim2.new(1, -10, 0, 20)
+    ServerHopHeader.BackgroundTransparency = 1
+    ServerHopHeader.TextColor3 = color_dark_text
+    ServerHopHeader.TextSize = 11
+    ServerHopHeader.Font = Enum.Font.GothamBold
+    ServerHopHeader.Text = "SERVER MANAGEMENT:"
+    ServerHopHeader.Parent = SettingsTab
+
+    AddButton(SettingsTab, "REJOIN / SERVER HOP", function()
+        showNotification("Finding new server / Rejoining...")
+        pcall(function()
+            if #Players:GetPlayers() <= 1 then
+                Players.LocalPlayer:Kick("\nRejoining...")
+                task.wait(1)
+                TeleportService:Teleport(game.PlaceId, LocalPlayer)
+            else
+                TeleportService:Teleport(game.PlaceId, LocalPlayer)
+            end
+        end)
+    end)
+
+    local AntiAfkHeader = Instance.new("TextLabel")
+    AntiAfkHeader.Size = UDim2.new(1, -10, 0, 20)
+    AntiAfkHeader.BackgroundTransparency = 1
+    AntiAfkHeader.TextColor3 = color_dark_text
+    AntiAfkHeader.TextSize = 11
+    AntiAfkHeader.Font = Enum.Font.GothamBold
+    AntiAfkHeader.Text = "ANTI-AFK SYSTEM:"
+    AntiAfkHeader.Parent = SettingsTab
+
+    local antiAfkConnection
+    AddToggle(SettingsTab, "ENABLE ANTI-AFK", function(state)
+        pcall(function()
+            if state then
+                if not antiAfkConnection then
+                    antiAfkConnection = LocalPlayer.Idled:Connect(function()
+                        local VirtualUser = game:GetService("VirtualUser")
+                        VirtualUser:CaptureController()
+                        VirtualUser:ClickButton2(Vector2.new())
+                    end)
+                end
+                showNotification("Anti-AFK Enabled Successfully!")
+            else
+                if antiAfkConnection then
+                    antiAfkConnection:Disconnect()
+                    antiAfkConnection = nil
+                end
+                showNotification("Anti-AFK Disabled!")
+            end
+        end)
+    end)
+
+
+    local ConfigHeader = Instance.new("TextLabel")
+    ConfigHeader.Size = UDim2.new(1, -10, 0, 20)
+    ConfigHeader.BackgroundTransparency = 1
+    ConfigHeader.TextColor3 = color_dark_text
+    ConfigHeader.TextSize = 11
+    ConfigHeader.Font = Enum.Font.GothamBold
+    ConfigHeader.Text = "CONFIG SYSTEM:"
+    ConfigHeader.Parent = SettingsTab
+
+    AddButton(SettingsTab, "SAVE CONFIG", function()
+        pcall(function()
+            local configData = {
+                AccentR = current_accent.R,
+                AccentG = current_accent.G,
+                AccentB = current_accent.B,
+                SavedAudios = savedAudioDatabase
+            }
+            if writefile then
+                writefile("SecureMaangasConfig.json", HttpService:JSONEncode(configData))
+                showNotification("Config & Saved IDs Successfully Saved!")
+            else
+                showNotification("Executor does not support writefile!")
+            end
+        end)
+    end)
+
+    AddButton(SettingsTab, "LOAD CONFIG", function()
+        pcall(function()
+            if readfile and isfile and isfile("SecureMaangasConfig.json") then
+                local data = HttpService:JSONDecode(readfile("SecureMaangasConfig.json"))
+                if data then
+                    if data.AccentR then
+                        UpdateAllAccents(Color3.new(data.AccentR, data.AccentG, data.AccentB))
+                    end
+                    if data.SavedAudios then
+                        for _, child in ipairs(SavedListContainer:GetChildren()) do
+                            if child:IsA("Frame") then
+                                child:Destroy()
+                            end
+                        end
+                        savedAudioDatabase = {}
+                        
+                        for _, audio in ipairs(data.SavedAudios) do
+                            addPresetMusicID(audio.Name, audio.Id, false)
+                        end
+                    end
+                    showNotification("Config & Saved IDs Successfully Loaded!")
+                end
+            else
+                showNotification("No Saved Config Found!")
+            end
+        end)
+    end)
+
+    AddButton(SettingsTab, "DESTROY UI", function()
+        pcall(function()
+            if ScreenGui then
+                ScreenGui:Destroy()
+            end
+        end)
+        showNotification("UI Destroyed!")
+    end)
+end
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Name = "HideMenuBtn"
+ToggleBtn.Parent = ScreenGui
+ToggleBtn.BackgroundTransparency = 1 
+ToggleBtn.Position = UDim2.new(0, 20, 0.5, -30)
+ToggleBtn.Size = UDim2.new(0, 50, 0, 50)
+ToggleBtn.Text = ""
+ToggleBtn.AutoButtonColor = false
+ToggleBtn.Active = true
+MakeDraggableCustom(ToggleBtn)
+
+local MenuBladeHolder = Instance.new("Frame")
+MenuBladeHolder.Name = "MenuBladeHolder"
+MenuBladeHolder.Parent = ToggleBtn
+MenuBladeHolder.AnchorPoint = Vector2.new(0.5, 0.5)
+MenuBladeHolder.BackgroundTransparency = 1
+MenuBladeHolder.Position = UDim2.new(0.5, 0, 0.5, 0)
+MenuBladeHolder.Size = UDim2.new(1, 10, 1, 10)
+
+local function CreateMenuBlade(rot)
+    local mblade = Instance.new("Frame")
+    mblade.Parent = MenuBladeHolder
+    mblade.AnchorPoint = Vector2.new(0.5, 0.5)
+    mblade.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    mblade.BorderSizePixel = 0
+    mblade.Position = UDim2.new(0.5, 0, 0.5, 0)
+    mblade.Size = UDim2.new(0, 5, 0, 18)
+    mblade.Rotation = rot
+    local corner = Instance.new("UICorner") corner.CornerRadius = UDim.new(1, 0) corner.Parent = mblade
+    return mblade
+end
+
+CreateMenuBlade(0) CreateMenuBlade(90) CreateMenuBlade(180) CreateMenuBlade(270)
+
+RunService.RenderStepped:Connect(function(dt)
+    if MenuBladeHolder and MenuBladeHolder.Parent then
+        MenuBladeHolder.Rotation = MenuBladeHolder.Rotation - (dt * 150)
+    end
+end)
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    isVisible = not isVisible
+    local mainFrame = ScreenGui:FindFirstChild("MainFrame", true)
+    if mainFrame then
+        if isVisible then
+            mainFrame.Visible = true
+            mainFrame.Size = UDim2.new(0, 0, 0, 0)
+            Tween(mainFrame, "Size", UDim2.new(0, 500, 0, 340), 0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        else
+            Tween(mainFrame, "Size", UDim2.new(0, 0, 0, 0), 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+            task.wait(0.2)
+            if not isVisible then mainFrame.Visible = false end
+        end
+    end
+end)
